@@ -1,0 +1,17 @@
+# Dependencias de Node
+node_modules/
+
+# Build del frontend (si genera alguno)
+dist/
+
+# Build de Rust/Tauri — esto es lo que pesa los 8GB, se regenera solo
+src-tauri/target/
+
+# Llaves de firma del updater — NUNCA subir la privada a GitHub
+*.key
+
+# Archivos propios del sistema operativo / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

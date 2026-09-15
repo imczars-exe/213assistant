@@ -1,0 +1,39 @@
+[package]
+name = "assistant213"
+version = "0.1.0"
+description = "213 Assistant — captura y edición de chatlog de rol, exportado a texto plano."
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+tauri-plugin-clipboard-manager = "2"
+tauri-plugin-shell = "2"
+tauri-plugin-updater = "2"
+tauri-plugin-single-instance = "2"
+
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+tokio-tungstenite = "0.24"
+futures-util = "0.3"
+reqwest = { version = "0.12", features = ["json"] }
+base64 = "0.22"
+
+# Detección de proceso FiveM multiplataforma (equivalente a tasklist/ps del main.js original)
+sysinfo = "0.32"
+
+# Discord Rich Presence: muestra una actividad ("Haciendo relatos") al
+# lado del usuario en Discord mientras la app está abierta.
+discord-rich-presence = "1"
+
+[profile.release]
+# Build liviano y portable: sin símbolos de debug, LTO y tamaño optimizado.
+panic = "abort"
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true

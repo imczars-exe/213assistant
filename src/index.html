@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<!-- La CSP va en tauri.conf.json (app.security.csp); Tauri la inyecta solo. -->
+<title>213 Assistant</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header data-tauri-drag-region>
+    <div class="logo">
+      <div class="logo-icon">
+        <img src="logo2.png" alt="213 Assistant" />
+      </div>
+      <div>213 Assistant</div>
+      <span class="version-badge">v1.0.3</span>
+    </div>
+    <nav class="tabs" id="viewTabs">
+      <button class="tab" data-view="chat" type="button" data-active="true">Chatlog</button>
+      <button class="tab" data-view="editor" type="button">Editor de capturas</button>
+      <button class="tab" data-view="inventory" type="button">Inventario</button>
+    </nav>
+    <button class="btn btn-ghost update-btn" id="updateBtn" type="button" style="display: none;"></button>
+    <div class="header-spacer"></div>
+    <div class="window-controls">
+      <button class="win-btn" id="checkUpdateBtn" type="button" title="Buscar actualizaciones" aria-label="Buscar actualizaciones">
+        <svg viewBox="0 0 10 10" width="10" height="10">
+          <path
+            d="M1.5 5a3.5 3.5 0 0 1 6-2.47M8.5 5a3.5 3.5 0 0 1-6 2.47M7.3 1.6v1.9h-1.9M2.7 8.4V6.5h1.9"
+            fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+          />
+        </svg>
+      </button>
+      <button class="win-btn" id="winMinimizeBtn" type="button" title="Minimizar" aria-label="Minimizar">
+        <svg viewBox="0 0 10 10" width="10" height="10">
+          <rect x="1" y="4.5" width="8" height="1" fill="currentColor" />
+        </svg>
+      </button>
+      <button class="win-btn" id="winMaximizeBtn" type="button" title="Maximizar" aria-label="Maximizar">
+        <svg viewBox="0 0 10 10" width="10" height="10">
+          <rect x="1.5" y="1.5" width="7" height="7" fill="none" stroke="currentColor" stroke-width="1" />
+        </svg>
+      </button>
+      <button class="win-btn win-btn-close" id="winCloseBtn" type="button" title="Cerrar" aria-label="Cerrar">
+        <svg viewBox="0 0 10 10" width="10" height="10">
+          <path d="M1 1 L9 9 M9 1 L1 9" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" />
+        </svg>
+      </button>
+    </div>
+  </header>
+  <div class="resize-handle resize-handle-t" data-resize-dir="North"></div>
+  <div class="resize-handle resize-handle-b" data-resize-dir="South"></div>
+  <div class="resize-handle resize-handle-l" data-resize-dir="West"></div>
+  <div class="resize-handle resize-handle-r" data-resize-dir="East"></div>
+  <div class="resize-handle resize-handle-tl" data-resize-dir="NorthWest"></div>
+  <div class="resize-handle resize-handle-tr" data-resize-dir="NorthEast"></div>
+  <div class="resize-handle resize-handle-bl" data-resize-dir="SouthWest"></div>
+  <div class="resize-handle resize-handle-br" data-resize-dir="SouthEast"></div>
+
+  <main class="applayout view" id="chatView" data-view-id="chat" data-active="true">
+    <div class="controlbar">
+      <input type="text" id="searchInput" class="search-input" placeholder="Filtrar texto…" autocomplete="off" />
+    </div>
+
+    <div class="filters" id="filterRow">
+      <label class="chip"><input type="checkbox" data-filter="say" checked />Diálogo</label>
+      <label class="chip"><input type="checkbox" data-filter="ooc" />OOC</label>
+      <label class="chip"><input type="checkbox" data-filter="rol" checked />Rol</label>
+      <label class="chip"><input type="checkbox" data-filter="other" />Otro</label>
+      <label class="chip"><input type="checkbox" id="stripTimestampToggle" checked />Quitar [hh:mm:ss] del chat</label>
+    </div>
+
+    <div class="log-panel">
+      <div class="log" id="logArea" aria-live="polite">
+        <div class="log__empty" id="logEmpty">
+          Sin líneas capturadas todavía.<br />
+          Si ya cerraste FiveM, toca <strong>Parse</strong> para cargar el chatlog guardado.
+        </div>
+      </div>
+    </div>
+
+    <footer class="bottombar">
+      <button class="btn btn-ghost" id="parseBtn" type="button" title="Cargar el chatlog guardado en disco (útil si ya cerraste FiveM)">Parse</button>
+      <button class="btn btn-ghost" id="copyBtn" type="button">Copiar</button>
+      <button class="btn btn-ghost" id="clearBtn" type="button">Limpiar</button>
+      <button class="btn btn-danger" id="clearAutosaveBtn" type="button" title="Borra el chatlog.txt guardado en disco. No se puede deshacer.">Borrar chatlog</button>
+      <button class="btn btn-primary" id="exportBtn" type="button">Exportar .txt</button>
+    </footer>
+  </main>
+
+  <main class="applayout view" id="editorView" data-view-id="editor">
+    <div class="editor-toolbar">
+      <button class="btn btn-ghost" id="openImageBtn" type="button">Abrir imagen</button>
+
+      <div class="dropdown" id="resDropdownWrapper" hidden>
+        <button class="btn btn-ghost" id="resDropdownBtn" type="button">Resolución ▾</button>
+        <div class="dropdown-panel" id="resDropdownPanel">
+          <label class="editor-field">
+            <span>Tamaño</span>
+            <input type="number" id="resWidthInput" min="1" class="editor-number" />
+            <span>×</span>
+            <input type="number" id="resHeightInput" min="1" class="editor-number" />
+          </label>
+          <label class="chip"><input type="checkbox" id="lockAspectToggle" checked />Mantener proporción</label>
+          <button class="btn btn-primary btn-block" id="applyResolutionBtn" type="button">Aplicar resolución</button>
+          <div class="dropdown-divider"></div>
+          <div class="dropdown-label">Predeterminadas</div>
+          <div class="dropdown-presets">
+            <button class="seg-btn" id="resPreset1080Btn" type="button">1920×1080</button>
+            <button class="seg-btn" id="resPreset720Btn" type="button">1280×720</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="dropdown" id="cropSizeDropdownWrapper" hidden>
+        <button class="btn btn-ghost" id="cropSizeDropdownBtn" type="button">Recortar imagen ▾</button>
+        <div class="dropdown-panel" id="cropSizeDropdownPanel">
+          <label class="editor-field">
+            <span>Tamaño</span>
+            <input type="number" id="cropWidthInput" min="1" class="editor-number" disabled />
+            <span>×</span>
+            <input type="number" id="cropHeightInput" min="1" class="editor-number" disabled />
+          </label>
+          <div class="dropdown-hint">Se aplica automáticamente al escribir.</div>
+          <div class="dropdown-divider"></div>
+          <div class="dropdown-label">Predeterminado</div>
+          <div class="dropdown-presets">
+            <button class="seg-btn" id="cropPreset800Btn" type="button">800×800</button>
+            <button class="seg-btn" id="cropPreset1080Btn" type="button">1080×1080</button>
+            <button class="seg-btn" id="cropPreset1600Btn" type="button">1600×1080</button>
+          </div>
+          <div class="dropdown-divider"></div>
+          <div class="dropdown-label">Imagen dentro del recorte</div>
+          <label class="editor-field">
+            <span>Zoom</span>
+            <input type="range" id="cropZoomInput" min="10" max="400" value="100" disabled />
+            <span class="editor-field-value" id="cropZoomValue">100%</span>
+          </label>
+          <button class="btn btn-ghost btn-block" id="cropResetImageBtn" type="button" disabled>Restablecer imagen</button>
+          <div class="dropdown-hint">Arrastrá dentro del marco para moverlo; afuera, para mover la imagen. Rueda del mouse: zoom.</div>
+          <div class="dropdown-hint">En los tiradores: Alt = redimensionar desde el centro · Shift = mantener proporción.</div>
+        </div>
+      </div>
+
+      <button class="btn btn-ghost" id="addImageBtn" type="button" title="Superponer otra imagen como capa" hidden>+ Imagen</button>
+
+      <div class="editor-field layer-controls" id="layerControls" hidden>
+        <span>Capa</span>
+        <button class="btn btn-ghost btn-icon" id="layerBackBtn" type="button" title="Enviar atrás">⤵</button>
+        <button class="btn btn-ghost btn-icon" id="layerFrontBtn" type="button" title="Traer al frente">⤴</button>
+        <span>Opacidad</span>
+        <input type="range" id="layerOpacityInput" min="0" max="100" value="100" title="Opacidad de la capa" />
+        <span class="editor-field-value" id="layerOpacityValue">100%</span>
+        <button class="btn btn-ghost btn-icon btn-danger" id="layerDeleteBtn" type="button" title="Eliminar capa seleccionada">🗑</button>
+      </div>
+
+      <div class="toolbar-spacer"></div>
+
+      <button class="btn btn-ghost" id="applyCropBtn" type="button" disabled hidden>Aplicar recorte</button>
+    </div>
+
+    <div class="editor-toolbar">
+      <label class="editor-field">
+        <span>Color</span>
+        <input type="color" id="textColorInput" value="#ffffff" />
+      </label>
+
+      <div class="swatches" id="colorSwatches" title="Clic: usar color · Clic derecho: quitar de la paleta"></div>
+      <button class="btn btn-ghost btn-swatch-add" id="addSwatchBtn" type="button" title="Guardar el color actual en la paleta">+ Color</button>
+
+      <label class="editor-field">
+        <span>Tamaño</span>
+        <input type="range" id="fontSizeInput" min="12" max="96" value="28" />
+        <span class="editor-field-value" id="fontSizeValue">28px</span>
+      </label>
+
+      <div class="swatches" id="sizePresets" title="Clic: usar tamaño · Clic derecho: quitar de la lista"></div>
+      <button class="btn btn-ghost btn-swatch-add" id="addSizePresetBtn" type="button" title="Guardar el tamaño actual como predeterminado">+ Tamaño</button>
+
+      <label class="chip"><input type="checkbox" id="strokeToggle" checked />Contorno</label>
+
+      <div class="editor-field bg-field" role="group" aria-label="Fondo del texto">
+        <span>Fondo</span>
+        <button class="seg-btn" id="bgNoneBtn" type="button" data-active="true">Ninguno</button>
+        <button class="seg-btn" id="bgSolidBtn" type="button">Negro</button>
+        <button class="seg-btn" id="bgSemiBtn" type="button">Semi</button>
+      </div>
+
+      <button class="btn btn-ghost" id="addTextBtn" type="button" data-active="false">+ Añadir texto</button>
+
+      <div class="toolbar-spacer"></div>
+
+      <button class="btn btn-primary" id="exportImageBtn" type="button">Exportar imagen</button>
+    </div>
+
+    <div class="editor-body">
+      <aside class="editor-sidebar">
+        <textarea id="textInput" class="editor-textarea" placeholder="Escribe tus lineas de rol."></textarea>
+      </aside>
+
+      <div class="canvas-panel">
+        <div class="canvas-scroll" id="canvasScroll">
+          <div class="canvas-empty" id="canvasEmpty">
+            Abre una captura de pantalla para empezar a editarla.
+          </div>
+          <canvas id="editorCanvas" hidden></canvas>
+        </div>
+      </div>
+
+      <aside class="editor-effects">
+        <div class="effects-title">Efectos</div>
+
+        <div class="effect-group">
+          <label class="effect-header">
+            <input type="checkbox" id="grainToggle" />
+            <span>Grano</span>
+            <span class="effect-value" id="grainIntensityValue">0%</span>
+          </label>
+          <input type="range" id="grainIntensityInput" min="0" max="100" value="0" />
+        </div>
+
+        <div class="effect-group">
+          <label class="effect-header">
+            <input type="checkbox" id="blurToggle" />
+            <span>Desenfoque</span>
+            <span class="effect-value" id="blurIntensityValue">0px</span>
+          </label>
+          <input type="range" id="blurIntensityInput" min="0" max="20" value="0" step="0.5" />
+        </div>
+
+        <div class="effect-group">
+          <label class="effect-header">
+            <span>Saturación</span>
+            <span class="effect-value" id="saturationValue">100%</span>
+          </label>
+          <input type="range" id="saturationInput" min="0" max="200" value="100" />
+        </div>
+
+        <div class="effect-group">
+          <label class="effect-header">
+            <span>Brillo</span>
+            <span class="effect-value" id="brightnessValue">100%</span>
+          </label>
+          <input type="range" id="brightnessInput" min="0" max="200" value="100" />
+        </div>
+
+        <div class="effect-group">
+          <label class="effect-header">
+            <span>Contraste</span>
+            <span class="effect-value" id="contrastValue">100%</span>
+          </label>
+          <input type="range" id="contrastInput" min="0" max="200" value="100" />
+        </div>
+
+        <div class="effect-group">
+          <label class="effect-header">
+            <input type="checkbox" id="bwToggle" />
+            <span>Blanco y negro</span>
+          </label>
+        </div>
+
+        <div class="effect-group">
+          <label class="effect-header">
+            <input type="checkbox" id="ghostToggle" />
+            <span>Efecto fantasma</span>
+          </label>
+          <div class="effect-subrow">
+            <span class="effect-sublabel">Desplaz. X</span>
+            <input type="range" id="ghostOffsetXInput" min="-150" max="150" value="0" />
+            <span class="effect-value" id="ghostOffsetXValue">0px</span>
+          </div>
+          <div class="effect-subrow">
+            <span class="effect-sublabel">Desplaz. Y</span>
+            <input type="range" id="ghostOffsetYInput" min="-150" max="150" value="0" />
+            <span class="effect-value" id="ghostOffsetYValue">0px</span>
+          </div>
+          <div class="effect-subrow">
+            <span class="effect-sublabel">Opacidad</span>
+            <input type="range" id="ghostOpacityInput" min="0" max="90" value="0" />
+            <span class="effect-value" id="ghostOpacityValue">0%</span>
+          </div>
+          <div class="effect-subrow">
+            <span class="effect-sublabel">Difuminado</span>
+            <input type="range" id="ghostBlurInput" min="0" max="20" value="0" step="0.5" />
+            <span class="effect-value" id="ghostBlurValue">0px</span>
+          </div>
+          <div class="effect-subrow">
+            <span class="effect-sublabel">Zoom</span>
+            <input type="range" id="ghostZoomInput" min="0" max="200" value="0" />
+            <span class="effect-value" id="ghostZoomValue">100%</span>
+          </div>
+        </div>
+
+        <button class="btn btn-ghost effects-reset" id="resetEffectsBtn" type="button">Restablecer efectos</button>
+      </aside>
+    </div>
+  </main>
+
+  <main class="applayout view" id="inventoryView" data-view-id="inventory">
+    <div class="controlbar inv-controlbar">
+      <nav class="subtabs" id="invSubtabs">
+        <button class="subtab" data-invview="products" type="button" data-active="true">Productos</button>
+        <button class="subtab" data-invview="orders" type="button">Pedidos</button>
+        <button class="subtab" data-invview="cash" type="button">Caja</button>
+      </nav>
+      <div class="toolbar-spacer"></div>
+      <div class="inv-sync-status" id="invSyncStatus" hidden></div>
+    </div>
+
+    <div class="inv-error-banner" id="invErrorBanner" hidden></div>
+
+    <section class="inv-panel" id="invProductsPanel" data-active="true">
+      <div class="inv-toolbar">
+        <input type="text" id="productSearchInput" class="search-input inv-search" placeholder="Buscar producto…" autocomplete="off" />
+        <select id="productTypeFilter" class="inv-select" title="Filtrar por tipo">
+          <option value="">Todos los tipos</option>
+        </select>
+        <div class="seg-group" id="productViewToggle" role="group" aria-label="Vista de productos">
+          <button class="seg-btn" data-productview="row" type="button" data-active="true" title="Vista en fila">☰ Fila</button>
+          <button class="seg-btn" data-productview="grid" type="button" title="Vista en cuadrícula">▦ Cuadrícula</button>
+        </div>
+        <div class="toolbar-spacer"></div>
+        <button class="btn btn-primary" id="addProductBtn" type="button">+ Nuevo producto</button>
+      </div>
+
+      <div class="inv-scroll">
+        <div class="inv-empty" id="productsEmpty">
+          Todavía no agregaste productos.<br />
+          Tocá <strong>+ Nuevo producto</strong> para empezar el inventario.
+        </div>
+        <div class="products-row" id="productsRow" hidden></div>
+        <div class="products-grid" id="productsGrid" hidden></div>
+      </div>
+    </section>
+
+    <section class="inv-panel" id="invOrdersPanel">
+      <div class="inv-toolbar">
+        <input type="text" id="orderSearchInput" class="search-input inv-search" placeholder="Buscar pedido…" autocomplete="off" />
+        <div class="toolbar-spacer"></div>
+        <button class="btn btn-primary" id="addOrderBtn" type="button">+ Nuevo pedido</button>
+      </div>
+
+      <div class="inv-scroll">
+        <div class="inv-empty" id="ordersEmpty">
+          Todavía no armaste ningún pedido.<br />
+          Tocá <strong>+ Nuevo pedido</strong> para elegir productos del inventario.
+        </div>
+        <div class="orders-list" id="ordersList" hidden></div>
+      </div>
+    </section>
+
+    <section class="inv-panel" id="invCashPanel">
+      <div class="inv-toolbar">
+        <label class="inv-date-field">
+          <span>Desde</span>
+          <input type="date" id="cashFromInput" class="inv-input inv-date-input" />
+        </label>
+        <label class="inv-date-field">
+          <span>Hasta</span>
+          <input type="date" id="cashToInput" class="inv-input inv-date-input" />
+        </label>
+        <button class="btn btn-ghost" id="cashClearFilterBtn" type="button">Limpiar filtro</button>
+        <div class="toolbar-spacer"></div>
+        <button class="btn btn-primary" id="addCashMovementBtn" type="button">+ Nuevo movimiento</button>
+      </div>
+
+      <div class="cash-summary">
+        <div class="cash-summary-card">
+          <span class="cash-summary-label">Saldo actual</span>
+          <span class="cash-summary-value" id="cashBalanceValue">$0.00</span>
+        </div>
+        <div class="cash-summary-card cash-summary-card--income">
+          <span class="cash-summary-label">Entradas (período)</span>
+          <span class="cash-summary-value" id="cashIncomeValue">$0.00</span>
+        </div>
+        <div class="cash-summary-card cash-summary-card--expense">
+          <span class="cash-summary-label">Salidas (período)</span>
+          <span class="cash-summary-value" id="cashExpenseValue">$0.00</span>
+        </div>
+      </div>
+
+      <div class="inv-scroll">
+        <div class="inv-empty" id="cashEmpty">
+          Todavía no hay movimientos de caja.<br />
+          Se cargan solos al confirmar un pedido, o tocá <strong>+ Nuevo movimiento</strong> para agregar uno a mano.
+        </div>
+        <div class="cash-list" id="cashList" hidden></div>
+      </div>
+    </section>
+  </main>
+
+  <div class="modal-overlay inv-lock-overlay" id="inventoryLoginOverlay" hidden>
+    <div class="modal inv-login-modal">
+      <div class="modal-header">
+        <div class="modal-title">Inventario protegido</div>
+      </div>
+      <div class="modal-body">
+        <p class="inv-modal-copy">Ingresá la contraseña compartida para acceder al inventario.</p>
+        <label class="inv-field">
+          <span>Contraseña</span>
+          <input type="password" id="inventoryPasswordInput" class="inv-input" placeholder="••••••••" autocomplete="off" />
+        </label>
+        <div class="inv-form-hint" id="inventoryLoginHint" hidden></div>
+      </div>
+      <div class="modal-footer">
+        <div class="toolbar-spacer"></div>
+        <button class="btn btn-primary" id="inventoryLoginBtn" type="button">Entrar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="productModalOverlay" hidden>
+    <div class="modal" id="productModal">
+      <div class="modal-header">
+        <div class="modal-title" id="productModalTitle">Nuevo producto</div>
+        <button class="btn btn-ghost btn-icon" id="productModalCloseBtn" type="button">✕</button>
+      </div>
+      <div class="modal-body">
+        <button type="button" class="product-image-picker" id="productImagePicker">
+          <img id="productImagePreview" alt="" hidden />
+          <span class="product-image-placeholder" id="productImagePlaceholder">+ Imagen</span>
+        </button>
+
+        <label class="inv-field">
+          <span>Nombre</span>
+          <input type="text" id="productNameInput" class="inv-input" placeholder="Ej: Rifle de asalto" />
+        </label>
+
+        <label class="inv-field">
+          <span>Tipo</span>
+          <input type="text" id="productTypeInput" class="inv-input" placeholder="Ej: Armas, Comida, Ropa…" list="productTypeList" autocomplete="off" />
+          <datalist id="productTypeList"></datalist>
+        </label>
+
+        <div class="inv-field-row">
+          <label class="inv-field">
+            <span>Precio de compra</span>
+            <input type="number" id="productPurchaseInput" class="inv-input" min="0" step="0.01" placeholder="0" />
+          </label>
+          <label class="inv-field">
+            <span>Precio de venta</span>
+            <input type="number" id="productSaleInput" class="inv-input" min="0" step="0.01" placeholder="0" />
+          </label>
+        </div>
+        <div class="inv-field-row">
+          <label class="inv-field">
+            <span>Cantidad</span>
+            <input type="number" id="productQuantityInput" class="inv-input" min="0" step="1" placeholder="0" />
+          </label>
+        </div>
+        <div class="inv-form-hint" id="productFormHint" hidden></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-danger" id="deleteProductBtn" type="button" hidden>Eliminar</button>
+        <div class="toolbar-spacer"></div>
+        <button class="btn btn-ghost" id="cancelProductBtn" type="button">Cancelar</button>
+        <button class="btn btn-primary" id="saveProductBtn" type="button">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="orderModalOverlay" hidden>
+    <div class="modal modal-wide" id="orderModal">
+      <div class="modal-header">
+        <div class="modal-title">Nuevo pedido</div>
+        <button class="btn btn-ghost btn-icon" id="orderModalCloseBtn" type="button">✕</button>
+      </div>
+      <div class="modal-body order-modal-body">
+        <div class="order-picker">
+          <input type="text" id="orderProductSearch" class="search-input" placeholder="Buscar producto en inventario…" autocomplete="off" />
+          <div class="order-picker-list" id="orderPickerList"></div>
+        </div>
+        <div class="order-cart">
+          <div class="order-cart-empty" id="orderCartEmpty">Agregá productos del inventario al pedido.</div>
+          <div class="order-cart-list" id="orderCartList"></div>
+          <div class="order-cart-footer">
+            <label class="inv-field order-note-field">
+              <span>Nota (opcional)</span>
+              <input type="text" id="orderNoteInput" class="inv-input" placeholder="Cliente, entrega, etc." />
+            </label>
+            <div class="order-total" id="orderTotal">Total: $0.00</div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <div class="toolbar-spacer"></div>
+        <button class="btn btn-ghost" id="cancelOrderBtn" type="button">Cancelar</button>
+        <button class="btn btn-primary" id="confirmOrderBtn" type="button">Confirmar pedido</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="cashModalOverlay" hidden>
+    <div class="modal" id="cashModal">
+      <div class="modal-header">
+        <div class="modal-title">Nuevo movimiento</div>
+        <button class="btn btn-ghost btn-icon" id="cashModalCloseBtn" type="button">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="seg-group cash-kind-toggle" id="cashKindToggle" role="group" aria-label="Tipo de movimiento">
+          <button class="seg-btn" data-cashkind="income" type="button" data-active="true">Entrada</button>
+          <button class="seg-btn" data-cashkind="expense" type="button">Salida</button>
+        </div>
+
+        <label class="inv-field">
+          <span>Monto</span>
+          <input type="number" id="cashAmountInput" class="inv-input" min="0" step="0.01" placeholder="0" />
+        </label>
+
+        <label class="inv-field">
+          <span>Descripción</span>
+          <input type="text" id="cashDescriptionInput" class="inv-input" placeholder="Ej: Compra de mercadería, alquiler, etc." />
+        </label>
+        <div class="inv-form-hint" id="cashFormHint" hidden></div>
+      </div>
+      <div class="modal-footer">
+        <div class="toolbar-spacer"></div>
+        <button class="btn btn-ghost" id="cancelCashBtn" type="button">Cancelar</button>
+        <button class="btn btn-primary" id="saveCashBtn" type="button">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="bridge.js"></script>
+  <script src="renderer.js"></script>
+  <script src="editor.js"></script>
+  <script src="inventory.js"></script>
+</body>
+</html>

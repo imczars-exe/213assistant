@@ -1,0 +1,15 @@
+{
+  "name": "assistant213",
+  "version": "1.0.3",
+  "private": true,
+  "description": "213 Assistant — captura y edición de chatlog de rol (versión Tauri, portable).",
+  "scripts": {
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "postbuild": "node generate-latest-json.js",
+    "tauri": "tauri"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.11.4"
+  }
+}

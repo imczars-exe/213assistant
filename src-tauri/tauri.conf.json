@@ -1,0 +1,62 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "213 Assistant",
+  "version": "1.0.3",
+  "identifier": "com.assistant213.app",
+  "build": {
+    "frontendDist": "../src"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "213 Assistant",
+        "width": 460,
+        "height": 720,
+        "minWidth": 380,
+        "minHeight": 480,
+        "backgroundColor": "#171512",
+        "decorations": false,
+        "resizable": true,
+        "maximized": true,
+        "visible": false
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; script-src 'self'; connect-src ipc: http://ipc.localhost"
+    },
+    "withGlobalTauri": true
+  },
+      "bundle": {
+      "active": true,
+      "targets": ["nsis", "msi"],
+      "createUpdaterArtifacts": true,
+      "icon": [
+        "icons/32x32.png",
+        "icons/128x128.png",
+        "icons/128x128@2x.png",
+        "icons/icon.ico"
+      ],
+      "windows": {
+        "wix": {
+          "bannerPath": "installer/wix-banner.bmp",
+          "dialogImagePath": "installer/wix-dialog.bmp"
+        },
+        "nsis": {
+          "installMode": "currentUser",
+          "headerImage": "installer/nsis-header.bmp",
+          "sidebarImage": "installer/nsis-sidebar.bmp"
+        }
+      }
+    },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/imczars-exe/213assistant/releases/latest/download/latest.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IENDOEE1RUUwMDg5NDk0QTIKUldTaWxKUUk0RjZLekpUQ2lwdVdFNnJHWnBXSGRGcmFiOUJsODBtTFlxSVlXb3I0a1BENm5IUC8K",
+      "windows": {
+        "installMode": "passive"
+      }
+    }
+  }
+}
