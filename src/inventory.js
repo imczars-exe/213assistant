@@ -164,6 +164,8 @@ const inventoryLoginOverlay = document.getElementById('inventoryLoginOverlay');
 const inventoryPasswordInput = document.getElementById('inventoryPasswordInput');
 const inventoryLoginHint = document.getElementById('inventoryLoginHint');
 const inventoryLoginBtn = document.getElementById('inventoryLoginBtn');
+const inventoryLoginCancelBtn = document.getElementById('inventoryLoginCancelBtn');
+const inventoryLoginCloseBtn = document.getElementById('inventoryLoginCloseBtn');
 
 function showInventoryLogin() {
   if (!inventoryLoginOverlay) return;
@@ -175,6 +177,19 @@ function showInventoryLogin() {
 
 function hideInventoryLogin() {
   if (inventoryLoginOverlay) inventoryLoginOverlay.hidden = true;
+}
+
+// Cancelar no desbloquea nada: solo cierra el pedido de contraseña y saca a
+// la persona de la pestaña de Inventario (si se quedara "adentro" sin
+// haberse logueado, quedaría viendo un panel vacío sin ninguna capa que
+// hacer). Vuelve al Chatlog simulando el click en esa pestaña, para no
+// duplicar la lógica de cambio de vista que ya vive en renderer.js.
+function cancelInventoryLogin() {
+  hideInventoryLogin();
+  inventoryPasswordInput.value = '';
+  inventoryTabActive = false;
+  const chatTabBtn = document.querySelector('.tab[data-view="chat"]');
+  if (chatTabBtn) chatTabBtn.click();
 }
 
 function attemptInventoryLogin() {
@@ -214,6 +229,8 @@ function attemptInventoryLogin() {
 }
 
 if (inventoryLoginBtn) inventoryLoginBtn.addEventListener('click', attemptInventoryLogin);
+if (inventoryLoginCancelBtn) inventoryLoginCancelBtn.addEventListener('click', cancelInventoryLogin);
+if (inventoryLoginCloseBtn) inventoryLoginCloseBtn.addEventListener('click', cancelInventoryLogin);
 if (inventoryPasswordInput) {
   inventoryPasswordInput.addEventListener('keydown', (event) => {
     if (event.key === 'Enter') attemptInventoryLogin();

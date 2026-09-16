@@ -15,14 +15,22 @@ const fontSizeValueEl = document.getElementById('fontSizeValue');
 const sizePresetsEl = document.getElementById('sizePresets');
 const addSizePresetBtn = document.getElementById('addSizePresetBtn');
 const strokeToggle = document.getElementById('strokeToggle');
+const strokeChipEl = document.getElementById('strokeChip');
 const bgNoneBtn = document.getElementById('bgNoneBtn');
 const bgSolidBtn = document.getElementById('bgSolidBtn');
 const bgSemiBtn = document.getElementById('bgSemiBtn');
+const textBgFieldEl = document.getElementById('textBgField');
 const exportImageBtn = document.getElementById('exportImageBtn');
 const canvasEmpty = document.getElementById('canvasEmpty');
 const canvasScrollEl = document.getElementById('canvasScroll');
 const canvas = document.getElementById('editorCanvas');
 const ctx = canvas.getContext('2d');
+
+const canvasZoomControlsEl = document.getElementById('canvasZoomControls');
+const zoomOutBtn = document.getElementById('zoomOutBtn');
+const zoomInBtn = document.getElementById('zoomInBtn');
+const zoomValueBtn = document.getElementById('zoomValueBtn');
+const zoomFitBtn = document.getElementById('zoomFitBtn');
 
 const colorSwatchesEl = document.getElementById('colorSwatches');
 const addSwatchBtn = document.getElementById('addSwatchBtn');
@@ -38,12 +46,29 @@ const resDropdownWrapper = document.getElementById('resDropdownWrapper');
 const resDropdownPanel = document.getElementById('resDropdownPanel');
 
 const addImageBtn = document.getElementById('addImageBtn');
+const addRectBtn = document.getElementById('addRectBtn');
+const addBlurBtn = document.getElementById('addBlurBtn');
 const layerControlsEl = document.getElementById('layerControls');
 const layerFrontBtn = document.getElementById('layerFrontBtn');
 const layerBackBtn = document.getElementById('layerBackBtn');
 const layerOpacityInput = document.getElementById('layerOpacityInput');
 const layerOpacityValueEl = document.getElementById('layerOpacityValue');
 const layerDeleteBtn = document.getElementById('layerDeleteBtn');
+const layerCropBtn = document.getElementById('layerCropBtn');
+const layerCropApplyBtn = document.getElementById('layerCropApplyBtn');
+const layerCropCancelBtn = document.getElementById('layerCropCancelBtn');
+
+const shapeControlsEl = document.getElementById('shapeControls');
+const shapeRectFieldsEl = document.getElementById('shapeRectFields');
+const shapeFillToggle = document.getElementById('shapeFillToggle');
+const shapeFillColorInput = document.getElementById('shapeFillColorInput');
+const shapeStrokeToggle = document.getElementById('shapeStrokeToggle');
+const shapeStrokeColorInput = document.getElementById('shapeStrokeColorInput');
+const shapeStrokeWidthInput = document.getElementById('shapeStrokeWidthInput');
+const shapeStrokeWidthValueEl = document.getElementById('shapeStrokeWidthValue');
+const shapeBlurFieldsEl = document.getElementById('shapeBlurFields');
+const shapeBlurAmountInput = document.getElementById('shapeBlurAmountInput');
+const shapeBlurAmountValueEl = document.getElementById('shapeBlurAmountValue');
 
 const applyCropBtn = document.getElementById('applyCropBtn');
 const cropWidthInput = document.getElementById('cropWidthInput');
@@ -53,8 +78,6 @@ const cropPreset1600Btn = document.getElementById('cropPreset1600Btn');
 const cropSizeDropdownBtn = document.getElementById('cropSizeDropdownBtn');
 const cropSizeDropdownWrapper = document.getElementById('cropSizeDropdownWrapper');
 const cropSizeDropdownPanel = document.getElementById('cropSizeDropdownPanel');
-const cropZoomInput = document.getElementById('cropZoomInput');
-const cropZoomValueEl = document.getElementById('cropZoomValue');
 const cropResetImageBtn = document.getElementById('cropResetImageBtn');
 
 const grainToggle = document.getElementById('grainToggle');
@@ -151,7 +174,7 @@ const MAX_HISTORY = 60;
 
 function cloneLayers(list) {
   return list.map((o) =>
-    o.type === 'image'
+    o.type === 'image' || o.type === 'shape'
       ? { ...o }
       : { ...o, lineRuns: o.lineRuns.map((runs) => runs.map((r) => ({ ...r }))) }
   );
@@ -193,11 +216,81 @@ function updateImageDependentUI() {
   resDropdownWrapper.hidden = !hasImage;
   cropSizeDropdownWrapper.hidden = !hasImage;
   addImageBtn.hidden = !hasImage;
+  addRectBtn.hidden = !hasImage;
+  addBlurBtn.hidden = !hasImage;
+  canvasZoomControlsEl.hidden = !hasImage;
 }
+
+// ---- zoom del lienzo ----
+// El canvas ya no se "encoge" solo con CSS (max-width/max-height:100%):
+// editor.js le pone un width/height explícito en píxeles según
+// `zoomLevel`, así se puede acercar más allá de su tamaño real (no solo
+// achicarlo para que entre). Cuando el resultado es más grande que
+// .canvas-scroll, el overflow:auto de ese contenedor permite recorrerlo
+// con scroll/barras, igual que cualquier visor de imágenes.
+let zoomLevel = 1; // 1 = 100% = un píxel del canvas por cada píxel CSS
+const ZOOM_MIN = 0.05;
+const ZOOM_MAX = 6;
+const ZOOM_STEP = 0.1;
+// Margen que deja .canvas-scroll (padding: 24px de cada lado) al calcular
+// cuánto entra "ajustado" — si no se descuenta, el cálculo de encaje deja
+// la imagen pegada a los bordes del panel.
+const CANVAS_SCROLL_PADDING = 48;
+
+function applyCanvasZoom() {
+  if (!image) return;
+  canvas.style.width = `${Math.max(1, Math.round(canvas.width * zoomLevel))}px`;
+  canvas.style.height = `${Math.max(1, Math.round(canvas.height * zoomLevel))}px`;
+  zoomValueBtn.textContent = `${Math.round(zoomLevel * 100)}%`;
+}
+
+// Nivel de zoom que hace que la imagen entre entera en el panel visible,
+// sin agrandar imágenes chicas más allá de su tamaño real — es exactamente
+// el comportamiento que tenía el canvas por defecto antes de que existiera
+// el zoom manual, así que se usa como punto de partida al abrir una imagen
+// o cambiar su resolución/recorte.
+function computeFitZoom() {
+  if (!image) return 1;
+  const availW = canvasScrollEl.clientWidth - CANVAS_SCROLL_PADDING;
+  const availH = canvasScrollEl.clientHeight - CANVAS_SCROLL_PADDING;
+  if (availW <= 0 || availH <= 0) return 1;
+  const scale = Math.min(1, availW / canvas.width, availH / canvas.height);
+  return Math.max(ZOOM_MIN, scale);
+}
+
+function fitZoomToContainer() {
+  zoomLevel = computeFitZoom();
+  applyCanvasZoom();
+}
+
+function setZoom(next) {
+  zoomLevel = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, next));
+  applyCanvasZoom();
+}
+
+zoomInBtn.addEventListener('click', () => setZoom(zoomLevel + ZOOM_STEP));
+zoomOutBtn.addEventListener('click', () => setZoom(zoomLevel - ZOOM_STEP));
+zoomValueBtn.addEventListener('click', () => setZoom(1));
+zoomFitBtn.addEventListener('click', () => fitZoomToContainer());
+
+// Ctrl/Cmd + rueda del mouse para acercar/alejar (convención estándar en
+// editores de imagen); la rueda sola se deja intacta para hacer scroll
+// normal dentro del panel cuando la imagen no entra entera con el zoom
+// actual.
+canvasScrollEl.addEventListener(
+  'wheel',
+  (evt) => {
+    if (!image || !(evt.ctrlKey || evt.metaKey)) return;
+    evt.preventDefault();
+    setZoom(zoomLevel + (evt.deltaY < 0 ? ZOOM_STEP : -ZOOM_STEP));
+  },
+  { passive: false }
+);
 
 function restoreHistoryState(state) {
   commitInlineEdit();
   if (cropMode) setCropMode(false);
+  if (layerCropId != null) cancelLayerCrop();
   image = state.image;
   canvas.width = state.canvasWidth;
   canvas.height = state.canvasHeight;
@@ -209,6 +302,10 @@ function restoreHistoryState(state) {
   canvas.hidden = !image;
   canvasEmpty.style.display = image ? 'none' : '';
   updateImageDependentUI();
+  // Deshacer/rehacer no toca el zoom que eligió la persona — solo
+  // reaplica ese mismo porcentaje al tamaño (posiblemente distinto) del
+  // canvas restaurado.
+  applyCanvasZoom();
   draw();
 }
 
@@ -240,7 +337,7 @@ window.addEventListener('keydown', (evt) => {
   // Mientras se está ajustando el marco de recorte (todavía sin aplicar),
   // Ctrl+Z no tiene una acción de recorte que deshacer — se usa Escape
   // para cancelar ese ajuste en curso.
-  if (cropMode) return;
+  if (cropMode || layerCropId != null) return;
   evt.preventDefault();
   if (evt.shiftKey) redo();
   else undo();
@@ -252,6 +349,16 @@ window.addEventListener('keydown', (evt) => {
 let cropMode = false;
 let cropDragState = null; // { type: 'move' | 'resize' | 'pan-image', handle?, origin, offsetX?, offsetY? }
 let cropRect = null; // { x, y, w, h } en coordenadas reales del canvas, pendiente de aplicar
+
+// ---- recorte de una capa de imagen individual (agregada con "+ Imagen") ----
+// Versión simplificada del recorte de fondo de arriba: sin zoom/paneo de la
+// imagen dentro del marco, solo 4 tiradores en las esquinas que arrancan
+// cubriendo toda la capa y se pueden achicar. Vive completamente aparte del
+// recorte de fondo (cropMode/cropRect) para no tener que tocar ese código
+// que ya funciona.
+let layerCropId = null; // id de la capa de imagen que se está recortando, o null
+let layerCropRect = null; // { x, y, w, h } en coordenadas reales del canvas
+let layerCropDragState = null; // { handle, origin } mientras se arrastra un tirador
 const MIN_CROP_SIZE = 8;
 
 // ---- mover/agrandar/achicar la imagen DENTRO del marco de recorte ----
@@ -311,10 +418,12 @@ function getCropImageDrawRect() {
   };
 }
 
-function syncCropZoomInput() {
-  cropZoomInput.value = String(Math.round(cropImgTransform.scale * 100));
-  cropZoomValueEl.textContent = `${cropZoomInput.value}%`;
-}
+// Ya no hay slider ni "100%" que mostrar (se sacó el control de Zoom del
+// panel de recorte: ahora solo se hace zoom con la rueda del mouse) — se
+// deja como no-op en vez de borrar todos los lugares que la llamaban para
+// mantener el estado sincronizado, por si en algún momento vuelve a hacer
+// falta mostrar el valor en algún lado.
+function syncCropZoomInput() {}
 
 // Se llama cada vez que el marco de recorte cambia de tamaño (arrastrando
 // tiradores o tipeando en los inputs de ancho/alto): si el marco creció y
@@ -347,13 +456,6 @@ function zoomCropImageAt(px, py, newScale) {
   clampCropImageTransform();
   syncCropZoomInput();
 }
-
-cropZoomInput.addEventListener('input', () => {
-  if (!cropMode || !cropRect) return;
-  const r = normalizeCropRect(cropRect);
-  zoomCropImageAt(r.x + r.w / 2, r.y + r.h / 2, Number(cropZoomInput.value) / 100);
-  draw();
-});
 
 cropResetImageBtn.addEventListener('click', () => {
   resetCropImageTransform();
@@ -392,6 +494,7 @@ function setCropMode(active) {
   canvas.classList.toggle('tool-crop', active);
   if (active) {
     setAddTextMode(false);
+    if (layerCropId != null) cancelLayerCrop();
     selectedId = null;
     // Arranca con el marco de recorte cubriendo toda la imagen, como en
     // Photoshop, listo para ajustar desde las esquinas/lados.
@@ -403,7 +506,6 @@ function setCropMode(active) {
     syncCropSizeInputs();
     resetCropImageTransform();
     syncCropZoomInput();
-    cropZoomInput.disabled = false;
     cropResetImageBtn.disabled = false;
   } else {
     cropRect = null;
@@ -413,7 +515,6 @@ function setCropMode(active) {
     applyCropBtn.disabled = true;
     cropWidthInput.disabled = true;
     cropHeightInput.disabled = true;
-    cropZoomInput.disabled = true;
     cropResetImageBtn.disabled = true;
   }
   draw();
@@ -671,6 +772,9 @@ applyCropBtn.addEventListener('click', () => {
   canvas.height = rect.h;
   resWidthInput.value = rect.w;
   resHeightInput.value = rect.h;
+  // Mismo criterio que deshacer/rehacer: el recorte cambia el tamaño del
+  // canvas, pero no el porcentaje de zoom que la persona tenía elegido.
+  applyCanvasZoom();
 
   setCropMode(false);
 });
@@ -693,6 +797,168 @@ document.addEventListener('mousedown', (evt) => {
   if (applyCropBtn.contains(target)) return;
   setCropMode(false);
 });
+
+// ---- recorte de una capa de imagen individual ("+ Imagen") ----
+// A diferencia del recorte de fondo, acá no hay paneo/zoom de la imagen
+// dentro del marco: el marco arranca cubriendo toda la capa (tal como se
+// ve hoy en el lienzo, ya escalada si se agrandó/achicó a mano) y solo se
+// puede achicar desde cualquiera de sus 4 esquinas.
+
+function getLayerCropObj() {
+  return layerCropId == null ? null : layers.find((o) => o.id === layerCropId) || null;
+}
+
+// Recorta el marco para que nunca se salga de los límites de la capa
+// (bounds = su x/y/width/height actuales).
+function normalizeLayerCropRect(rect, bounds) {
+  const x = Math.max(bounds.x, Math.min(bounds.x + bounds.w, rect.x));
+  const y = Math.max(bounds.y, Math.min(bounds.y + bounds.h, rect.y));
+  const w = Math.max(0, Math.min(bounds.x + bounds.w - x, rect.w));
+  const h = Math.max(0, Math.min(bounds.y + bounds.h - y, rect.h));
+  return { x, y, w, h };
+}
+
+function getLayerCropHandlePoints(rect) {
+  return {
+    nw: { x: rect.x, y: rect.y },
+    ne: { x: rect.x + rect.w, y: rect.y },
+    se: { x: rect.x + rect.w, y: rect.y + rect.h },
+    sw: { x: rect.x, y: rect.y + rect.h },
+  };
+}
+
+function getLayerCropHandleAt(point) {
+  if (!layerCropRect) return null;
+  const points = getLayerCropHandlePoints(layerCropRect);
+  const half = getCropHandleHitSize() / 2;
+  for (const key of ['nw', 'ne', 'se', 'sw']) {
+    const p = points[key];
+    if (Math.abs(point.x - p.x) <= half && Math.abs(point.y - p.y) <= half) return key;
+  }
+  return null;
+}
+
+function pointInLayerCropBody(point) {
+  if (!layerCropRect) return false;
+  return (
+    point.x >= layerCropRect.x &&
+    point.x <= layerCropRect.x + layerCropRect.w &&
+    point.y >= layerCropRect.y &&
+    point.y <= layerCropRect.y + layerCropRect.h
+  );
+}
+
+// Arrastra un tirador: la esquina opuesta a la que se mueve queda fija,
+// igual que al redimensionar cualquier capa.
+function resizeLayerCropRect(origin, handle, x, y, bounds) {
+  const anchor = getLayerCropHandlePoints(origin)[OPPOSITE_HANDLE[handle]];
+  const rawX = Math.min(anchor.x, x);
+  const rawY = Math.min(anchor.y, y);
+  const rawW = Math.abs(x - anchor.x);
+  const rawH = Math.abs(y - anchor.y);
+  return normalizeLayerCropRect({ x: rawX, y: rawY, w: rawW, h: rawH }, bounds);
+}
+
+function setLayerCropMode(obj) {
+  if (!obj || obj.type !== 'image') return;
+  commitInlineEdit();
+  if (cropMode) setCropMode(false);
+  setAddTextMode(false);
+  layerCropId = obj.id;
+  layerCropRect = { x: obj.x, y: obj.y, w: obj.width, h: obj.height };
+  draw();
+}
+
+function cancelLayerCrop() {
+  layerCropId = null;
+  layerCropRect = null;
+  layerCropDragState = null;
+  draw();
+}
+
+function applyLayerCrop() {
+  const obj = getLayerCropObj();
+  if (!obj || !layerCropRect) {
+    cancelLayerCrop();
+    return;
+  }
+  const bounds = { x: obj.x, y: obj.y, w: obj.width, h: obj.height };
+  const r = normalizeLayerCropRect(layerCropRect, bounds);
+  if (r.w < 1 || r.h < 1) {
+    cancelLayerCrop();
+    return;
+  }
+  pushHistory();
+
+  // El marco vive en coordenadas del lienzo (el tamaño MOSTRADO de la
+  // capa); acá se traduce a coordenadas de la imagen fuente
+  // (0..naturalWidth) para no perder resolución al recortar una capa que
+  // ya estaba agrandada o achicada a mano.
+  const srcX = ((r.x - obj.x) / obj.width) * obj.img.naturalWidth;
+  const srcY = ((r.y - obj.y) / obj.height) * obj.img.naturalHeight;
+  const srcW = (r.w / obj.width) * obj.img.naturalWidth;
+  const srcH = (r.h / obj.height) * obj.img.naturalHeight;
+
+  const cropped = document.createElement('canvas');
+  cropped.width = Math.max(1, Math.round(srcW));
+  cropped.height = Math.max(1, Math.round(srcH));
+  cropped.getContext('2d').drawImage(obj.img, srcX, srcY, srcW, srcH, 0, 0, cropped.width, cropped.height);
+
+  const newImg = new Image();
+  newImg.onload = () => {
+    obj.img = newImg;
+    obj.x = r.x;
+    obj.y = r.y;
+    obj.width = r.w;
+    obj.height = r.h;
+    layerCropId = null;
+    layerCropRect = null;
+    layerCropDragState = null;
+    draw();
+  };
+  newImg.src = cropped.toDataURL('image/png');
+}
+
+layerCropBtn.addEventListener('click', () => setLayerCropMode(getSelectedLayer()));
+layerCropApplyBtn.addEventListener('click', applyLayerCrop);
+layerCropCancelBtn.addEventListener('click', cancelLayerCrop);
+
+window.addEventListener('keydown', (evt) => {
+  if (evt.key !== 'Escape' || layerCropId == null || editingId != null) return;
+  cancelLayerCrop();
+});
+
+// Recuadro punteado + tiradores del marco de recorte de capa, al estilo del
+// recorte de fondo (oscurece todo lo que queda afuera).
+function drawLayerCropOverlay() {
+  if (layerCropId == null || !layerCropRect) return;
+  const obj = getLayerCropObj();
+  if (!obj) return;
+  const r = normalizeLayerCropRect(layerCropRect, { x: obj.x, y: obj.y, w: obj.width, h: obj.height });
+  ctx.save();
+  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  ctx.fillRect(0, 0, canvas.width, r.y);
+  ctx.fillRect(0, r.y + r.h, canvas.width, canvas.height - (r.y + r.h));
+  ctx.fillRect(0, r.y, r.x, r.h);
+  ctx.fillRect(r.x + r.w, r.y, canvas.width - (r.x + r.w), r.h);
+
+  ctx.setLineDash([]);
+  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = '#ffffff';
+  ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w, r.h);
+
+  const points = getLayerCropHandlePoints(r);
+  const size = Math.max(10, getCropHandleHitSize() * 0.55);
+  for (const key of ['nw', 'ne', 'se', 'sw']) {
+    const p = points[key];
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(p.x - size / 2, p.y - size / 2, size, size);
+    ctx.strokeStyle = 'rgba(0,0,0,0.65)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(p.x - size / 2, p.y - size / 2, size, size);
+  }
+  ctx.restore();
+}
 
 // ---- edición en vivo del texto ya puesto ----
 let editingId = null;
@@ -849,6 +1115,7 @@ resetEffectsBtn.addEventListener('click', () => {
   ghostOpacityInput.value = 0;
   ghostBlurInput.value = 0;
   ghostZoomInput.value = 0;
+  refreshAllRangeProgress();
   refreshEffectMeters();
   draw();
 });
@@ -861,6 +1128,7 @@ function setAddTextMode(active) {
 
 addTextBtn.addEventListener('click', () => {
   commitInlineEdit();
+  if (layerCropId != null) cancelLayerCrop();
   setAddTextMode(!addTextMode);
 });
 
@@ -955,7 +1223,20 @@ textInput.addEventListener('input', () => {
   }
   const auto = detectAutoColor(textInput.value);
   if (auto) textColorInput.value = auto;
+  updateAddTextBtnVisibility();
 });
+
+// El botón "+ Añadir texto" solo aparece si hay algo escrito en la casilla
+// de texto de la izquierda — si está vacía no hay nada que agregar, así
+// que no tiene sentido dejarlo ahí ocupando lugar.
+function updateAddTextBtnVisibility() {
+  const hasText = textInput.value.trim().length > 0;
+  addTextBtn.hidden = !hasText;
+  // Si el usuario borra todo el texto mientras el modo "agregar" seguía
+  // activo, se apaga solo — no puede quedar un modo activo sin botón
+  // visible para desactivarlo.
+  if (!hasText && addTextMode) setAddTextMode(false);
+}
 
 // ---- paleta de colores predeterminados (persistida) ----
 
@@ -992,6 +1273,11 @@ function renderSwatches() {
     });
     colorSwatchesEl.appendChild(btn);
   }
+  // El botón "+" vive dentro de la misma píldora que los swatches (al
+  // final, a la derecha) en vez de ser un botón aparte con texto — innerHTML
+  // = '' de arriba lo desmonta del DOM, así que se vuelve a enganchar acá.
+  // Es el mismo nodo (con su listener ya puesto), no uno nuevo.
+  colorSwatchesEl.appendChild(addSwatchBtn);
 }
 
 function persistSwatches() {
@@ -1293,6 +1579,7 @@ updateFontSizeLabel();
 
 function applyFontSize(size) {
   fontSizeInput.value = size;
+  refreshAllRangeProgress();
   updateFontSizeLabel();
   const target = getLiveTargetObj();
   if (!target) return;
@@ -1361,6 +1648,9 @@ function renderSizePresets() {
     });
     sizePresetsEl.appendChild(btn);
   }
+  // Mismo motivo que en renderSwatches(): reengancha el botón "+" (mismo
+  // nodo, no uno nuevo) al final de la píldora tras el innerHTML = ''.
+  sizePresetsEl.appendChild(addSizePresetBtn);
 }
 renderSizePresets();
 
@@ -1409,6 +1699,7 @@ bgSemiBtn.addEventListener('click', () => applyBgStyle('semi'));
 function syncToolbarToObject(obj) {
   textColorInput.value = firstColorOf(obj.lineRuns[0], obj.color);
   fontSizeInput.value = obj.fontSize;
+  refreshAllRangeProgress();
   updateFontSizeLabel();
   strokeToggle.checked = obj.stroke;
   bgStyleValue = obj.bg || 'none';
@@ -1423,14 +1714,39 @@ function getSelectedLayer() {
 
 function updateLayerControlsUI() {
   const obj = getSelectedLayer();
+  // "Contorno" y "Fondo" solo tienen sentido sobre un texto seleccionado
+  // (no aplican a imágenes ni formas), así que se ocultan el resto del
+  // tiempo en vez de quedar ahí sin hacer nada.
+  const isTextSelected = !!obj && obj.type === 'text';
+  strokeChipEl.hidden = !isTextSelected;
+  textBgFieldEl.hidden = !isTextSelected;
+
   if (!obj) {
     layerControlsEl.hidden = true;
+    shapeControlsEl.hidden = true;
     return;
   }
   layerControlsEl.hidden = false;
   const opacityPct = Math.round((obj.opacity != null ? obj.opacity : 1) * 100);
   layerOpacityInput.value = opacityPct;
   layerOpacityValueEl.textContent = `${opacityPct}%`;
+  refreshAllRangeProgress();
+
+  // Botones de recorte de capa: "Recortar" solo tiene sentido para una
+  // imagen superpuesta (no el fondo, que tiene su propio recorte aparte, ni
+  // texto/formas). Mientras se está recortando ESTA capa, se ocultan y se
+  // muestran en su lugar "Aplicar"/"Cancelar", y el resto de los controles
+  // de la capa se deshabilita para no reordenar/borrar a mitad de camino.
+  const isCroppingThis = layerCropId === obj.id;
+  layerCropBtn.hidden = obj.type !== 'image' || isCroppingThis;
+  layerCropApplyBtn.hidden = !isCroppingThis;
+  layerCropCancelBtn.hidden = !isCroppingThis;
+  layerFrontBtn.disabled = isCroppingThis;
+  layerBackBtn.disabled = isCroppingThis;
+  layerOpacityInput.disabled = isCroppingThis;
+  layerDeleteBtn.disabled = isCroppingThis;
+
+  shapeControlsEl.hidden = obj.type !== 'shape';
 }
 
 layerOpacityInput.addEventListener('input', () => {
@@ -1494,6 +1810,10 @@ openImageBtn.addEventListener('click', async () => {
     canvas.hidden = false;
     canvasEmpty.style.display = 'none';
     updateImageDependentUI();
+    // Imagen nueva: arranca "ajustada" al panel (mismo comportamiento que
+    // tenía el canvas por defecto antes de que hubiera zoom manual), no
+    // conservando el porcentaje que hubiera quedado de la imagen anterior.
+    fitZoomToContainer();
     // Una imagen nueva arranca su propia historia; la de la imagen
     // anterior ya no tiene sentido (referencia a otro canvas/tamaño).
     undoStack = [];
@@ -1509,6 +1829,8 @@ openImageBtn.addEventListener('click', async () => {
 addImageBtn.addEventListener('click', async () => {
   if (!image) return;
   commitInlineEdit();
+  if (cropMode) setCropMode(false);
+  if (layerCropId != null) cancelLayerCrop();
   const result = await window.signalLog.openImage();
   if (!result.ok) return;
 
@@ -1539,14 +1861,192 @@ addImageBtn.addEventListener('click', async () => {
   img.src = result.dataUrl;
 });
 
+// ---- agregar un rectángulo (forma geométrica) ----
+
+addRectBtn.addEventListener('click', () => {
+  if (!image) return;
+  commitInlineEdit();
+  if (cropMode) setCropMode(false);
+  if (layerCropId != null) cancelLayerCrop();
+  setAddTextMode(false);
+  pushHistory();
+  // Arranca centrado, con un tamaño cómodo relativo al lienzo — el usuario
+  // lo redimensiona libremente después desde cualquiera de sus 4 esquinas.
+  const width = Math.max(MIN_IMAGE_LAYER_SIZE, Math.min(canvas.width * 0.4, 260));
+  const height = Math.max(MIN_IMAGE_LAYER_SIZE, Math.min(canvas.height * 0.3, 160));
+  const obj = {
+    id: nextId++,
+    type: 'shape',
+    shapeType: 'rect',
+    x: (canvas.width - width) / 2,
+    y: (canvas.height - height) / 2,
+    width,
+    height,
+    fillEnabled: shapeFillToggle.checked,
+    fillColor: shapeFillColorInput.value,
+    strokeEnabled: shapeStrokeToggle.checked,
+    strokeColor: shapeStrokeColorInput.value,
+    strokeWidth: Number(shapeStrokeWidthInput.value),
+    opacity: 1,
+  };
+  layers.push(obj);
+  selectedId = obj.id;
+  draw();
+});
+
+// ---- agregar un área de desenfoque (para tapar caras, placas, etc.) ----
+// Es una "forma" más (mismo x/y/width/height, mismo sistema de arrastre y
+// tiradores, mismo botón de traer al frente/enviar atrás), pero en vez de
+// rellenar el área con un color, difumina lo que haya debajo de ella.
+
+addBlurBtn.addEventListener('click', () => {
+  if (!image) return;
+  commitInlineEdit();
+  if (cropMode) setCropMode(false);
+  if (layerCropId != null) cancelLayerCrop();
+  setAddTextMode(false);
+  pushHistory();
+  const width = Math.max(MIN_IMAGE_LAYER_SIZE, Math.min(canvas.width * 0.4, 260));
+  const height = Math.max(MIN_IMAGE_LAYER_SIZE, Math.min(canvas.height * 0.3, 160));
+  const obj = {
+    id: nextId++,
+    type: 'shape',
+    shapeType: 'blur',
+    x: (canvas.width - width) / 2,
+    y: (canvas.height - height) / 2,
+    width,
+    height,
+    blurAmount: Number(shapeBlurAmountInput.value),
+    opacity: 1,
+  };
+  layers.push(obj);
+  selectedId = obj.id;
+  draw();
+});
+
+// ---- panel de la forma seleccionada (relleno / borde) ----
+
+function getSelectedShape() {
+  const obj = getSelectedLayer();
+  return obj && obj.type === 'shape' ? obj : null;
+}
+
+function syncShapeToolbarToObject(obj) {
+  const isBlur = obj.shapeType === 'blur';
+  shapeRectFieldsEl.hidden = isBlur;
+  shapeBlurFieldsEl.hidden = !isBlur;
+  if (isBlur) {
+    shapeBlurAmountInput.value = obj.blurAmount;
+    shapeBlurAmountValueEl.textContent = `${obj.blurAmount}px`;
+  } else {
+    shapeFillToggle.checked = obj.fillEnabled;
+    shapeFillColorInput.value = obj.fillColor;
+    shapeStrokeToggle.checked = obj.strokeEnabled;
+    shapeStrokeColorInput.value = obj.strokeColor;
+    shapeStrokeWidthInput.value = obj.strokeWidth;
+    shapeStrokeWidthValueEl.textContent = `${obj.strokeWidth}px`;
+  }
+  refreshAllRangeProgress();
+}
+
+// Mismo criterio que el color/tamaño de texto: un único paso de historial
+// por cada gesto de arrastre (o cada apertura del selector de color), no
+// uno por cada evento 'input' mientras se arrastra.
+let shapeHistoryPending = true;
+function armShapeHistoryPending() {
+  shapeHistoryPending = true;
+}
+[shapeFillColorInput, shapeStrokeColorInput, shapeStrokeWidthInput, shapeBlurAmountInput].forEach((el) => {
+  el.addEventListener('focus', armShapeHistoryPending);
+  el.addEventListener('change', armShapeHistoryPending);
+});
+shapeStrokeWidthInput.addEventListener('pointerdown', armShapeHistoryPending);
+shapeBlurAmountInput.addEventListener('pointerdown', armShapeHistoryPending);
+
+shapeFillToggle.addEventListener('change', () => {
+  const target = getSelectedShape();
+  if (!target) return;
+  pushHistory();
+  target.fillEnabled = shapeFillToggle.checked;
+  draw();
+});
+
+shapeFillColorInput.addEventListener('input', () => {
+  const target = getSelectedShape();
+  if (!target) return;
+  if (shapeHistoryPending) pushHistory();
+  shapeHistoryPending = false;
+  target.fillColor = shapeFillColorInput.value;
+  draw();
+});
+
+shapeStrokeToggle.addEventListener('change', () => {
+  const target = getSelectedShape();
+  if (!target) return;
+  pushHistory();
+  target.strokeEnabled = shapeStrokeToggle.checked;
+  draw();
+});
+
+shapeStrokeColorInput.addEventListener('input', () => {
+  const target = getSelectedShape();
+  if (!target) return;
+  if (shapeHistoryPending) pushHistory();
+  shapeHistoryPending = false;
+  target.strokeColor = shapeStrokeColorInput.value;
+  draw();
+});
+
+shapeStrokeWidthInput.addEventListener('input', () => {
+  shapeStrokeWidthValueEl.textContent = `${shapeStrokeWidthInput.value}px`;
+  const target = getSelectedShape();
+  if (!target) return;
+  if (shapeHistoryPending) pushHistory();
+  shapeHistoryPending = false;
+  target.strokeWidth = Number(shapeStrokeWidthInput.value);
+  draw();
+});
+
+shapeBlurAmountInput.addEventListener('input', () => {
+  shapeBlurAmountValueEl.textContent = `${shapeBlurAmountInput.value}px`;
+  const target = getSelectedShape();
+  if (!target) return;
+  if (shapeHistoryPending) pushHistory();
+  shapeHistoryPending = false;
+  target.blurAmount = Number(shapeBlurAmountInput.value);
+  draw();
+});
+
 // ---- resolución de salida ----
 
 // Dropdown genérico: un botón que abre/cierra un panel flotante debajo
 // suyo, y se cierra solo al hacer clic afuera (o al abrir otro dropdown).
 function setupDropdown(toggleBtn, panelEl) {
+  // El panel es `position: fixed` (ver el comentario en .dropdown-panel en
+  // styles.css: la barra de herramientas recorta con overflow, así que un
+  // panel `absolute` quedaba cortado). Al ser fixed, sus coordenadas son
+  // respecto a la ventana y hay que calcularlas acá a partir de dónde está
+  // realmente el botón en ese momento.
+  function positionPanel() {
+    const rect = toggleBtn.getBoundingClientRect();
+    panelEl.style.top = `${rect.bottom + 8}px`;
+    panelEl.style.left = `${rect.left}px`;
+    // Si el panel se sale por la derecha de la ventana (botones que quedan
+    // al final de la barra), se corre hacia la izquierda lo justo para que
+    // entre, sin pasarse del borde izquierdo.
+    const panelRect = panelEl.getBoundingClientRect();
+    const overflowRight = panelRect.right - window.innerWidth + 8;
+    if (overflowRight > 0) {
+      panelEl.style.left = `${Math.max(8, rect.left - overflowRight)}px`;
+    }
+  }
   function close() {
     panelEl.classList.remove('open');
     document.removeEventListener('mousedown', onOutsideClick);
+    // `true` = fase de captura: así también se entera del scroll de la
+    // propia barra de herramientas, que no burbujea hasta window.
+    window.removeEventListener('scroll', positionPanel, true);
+    window.removeEventListener('resize', positionPanel);
   }
   function onOutsideClick(evt) {
     if (!panelEl.contains(evt.target) && evt.target !== toggleBtn) close();
@@ -1560,8 +2060,13 @@ function setupDropdown(toggleBtn, panelEl) {
     if (wasOpen) {
       close();
     } else {
+      // Primero `open` (para que deje de ser display:none y se pueda
+      // medir), recién después posicionar.
       panelEl.classList.add('open');
+      positionPanel();
       document.addEventListener('mousedown', onOutsideClick);
+      window.addEventListener('scroll', positionPanel, true);
+      window.addEventListener('resize', positionPanel);
     }
   });
   return close;
@@ -1594,6 +2099,7 @@ function applyResolution(newWidth, newHeight) {
   if (!image) return;
   commitInlineEdit();
   if (cropMode) setCropMode(false);
+  if (layerCropId != null) cancelLayerCrop();
   newWidth = Math.round(newWidth);
   newHeight = Math.round(newHeight);
   if (!(newWidth > 0 && newHeight > 0)) return;
@@ -1609,9 +2115,10 @@ function applyResolution(newWidth, newHeight) {
   for (const obj of layers) {
     obj.x *= scaleX;
     obj.y *= scaleY;
-    if (obj.type === 'image') {
+    if (obj.type === 'image' || obj.type === 'shape') {
       obj.width *= scaleX;
       obj.height *= scaleY;
+      if (obj.type === 'shape') obj.strokeWidth = Math.max(1, obj.strokeWidth * scaleAvg);
     } else {
       obj.fontSize = Math.max(MIN_FONT_SIZE, Math.round(obj.fontSize * scaleAvg));
     }
@@ -1621,6 +2128,9 @@ function applyResolution(newWidth, newHeight) {
   canvas.height = newHeight;
   resWidthInput.value = newWidth;
   resHeightInput.value = newHeight;
+  // Mismo criterio que el recorte: cambia el tamaño del canvas, no el
+  // porcentaje de zoom elegido.
+  applyCanvasZoom();
   draw();
 }
 
@@ -1657,12 +2167,12 @@ function measureText(obj) {
 // o imagen (su tamaño puesto ahí nomás) — el resto del código de
 // selección/arrastre/redimensionado usa esto sin preguntar de qué tipo es.
 function getBounds(obj) {
-  if (obj.type === 'image') return { width: obj.width, height: obj.height };
+  if (obj.type === 'image' || obj.type === 'shape') return { width: obj.width, height: obj.height };
   return measureText(obj);
 }
 
 function getHandleSize(obj) {
-  if (obj.type === 'image') {
+  if (obj.type === 'image' || obj.type === 'shape') {
     const { width, height } = getBounds(obj);
     return Math.min(24, Math.max(HANDLE_MIN_SIZE, Math.min(width, height) * 0.06));
   }
@@ -1811,45 +2321,97 @@ function draw() {
   //    puesta arriba de la foto original.
   drawGrain();
 
-  // 5) El texto se dibuja al final, sin los filtros de la foto, para que
-  //    siga leyéndose nítido por encima de cualquier efecto o imagen.
+  // 4.5) Formas geométricas y texto, sin los filtros de foto — nítidos
+  //    encima de la composición ya filtrada. Antes eran dos pasadas fijas
+  //    (primero todas las formas, después todo el texto), así que un
+  //    rectángulo jamás podía quedar por encima de un texto aunque se usara
+  //    "Traer al frente". Ahora es una sola pasada que respeta el orden
+  //    real del array `layers`, así que el orden de apilado (y los botones
+  //    de traer al frente / enviar atrás) funciona igual entre formas y
+  //    texto, en cualquier combinación.
   for (const obj of layers) {
-    if (obj.type !== 'text') continue;
-    if (obj.id === editingId) continue; // lo muestra el textarea de edición en vivo, no se pisa acá
-
-    ctx.font = fontString(obj);
-    ctx.textBaseline = 'top';
-    const { lines, lineHeight, width, height } = measureText(obj);
-
-    ctx.save();
-    ctx.globalAlpha = obj.opacity != null ? obj.opacity : 1;
-    drawTextBackground(obj, width, height);
-
-    lines.forEach((line, i) => {
-      const ly = obj.y + i * lineHeight;
-      if (obj.stroke) {
-        ctx.lineWidth = Math.max(2, obj.fontSize / 8);
-        ctx.strokeStyle = '#000000';
-        ctx.lineJoin = 'round';
-        ctx.strokeText(line, obj.x, ly);
+    if (obj.type === 'shape') {
+      ctx.save();
+      ctx.globalAlpha = obj.opacity != null ? obj.opacity : 1;
+      if (obj.shapeType === 'rect') {
+        if (obj.fillEnabled) {
+          ctx.fillStyle = obj.fillColor;
+          ctx.fillRect(obj.x, obj.y, obj.width, obj.height);
+        }
+        if (obj.strokeEnabled && obj.strokeWidth > 0) {
+          ctx.lineWidth = obj.strokeWidth;
+          ctx.strokeStyle = obj.strokeColor;
+          // El trazo queda centrado en el borde por defecto en canvas; se
+          // mete medio ancho hacia adentro para que no se recorte si el
+          // rectángulo está pegado al borde del lienzo.
+          const inset = obj.strokeWidth / 2;
+          ctx.strokeRect(
+            obj.x + inset,
+            obj.y + inset,
+            Math.max(0, obj.width - obj.strokeWidth),
+            Math.max(0, obj.height - obj.strokeWidth)
+          );
+        }
+      } else if (obj.shapeType === 'blur') {
+        // Difumina lo que ya está dibujado debajo de esta capa (fondo,
+        // imágenes superpuestas, o formas/texto puestos antes en el orden
+        // de capas) dentro de su rectángulo — no agrega color, tapa datos
+        // sensibles (una cara, una patente) dejando el resto intacto.
+        // Trampa estándar de canvas: se recorta al rectángulo y se vuelve a
+        // dibujar el lienzo ENTERO sobre sí mismo con un filtro de blur; el
+        // recorte deja ver solo el área de la forma, pero el filtro igual
+        // puede tomar de muestra los píxeles de alrededor (que están fuera
+        // del recorte) así el desenfoque no tiene un borde artificial feo.
+        ctx.beginPath();
+        ctx.rect(obj.x, obj.y, obj.width, obj.height);
+        ctx.clip();
+        ctx.filter = `blur(${obj.blurAmount}px)`;
+        ctx.drawImage(canvas, 0, 0);
+        ctx.filter = 'none';
       }
-      // Cada tramo de color de la línea se dibuja por separado, uno al
-      // lado del otro, para que un carácter o palabra puntual pueda tener
-      // su propio color sin afectar al resto de la línea.
-      const runs = obj.lineRuns[i] || [{ text: line, color: obj.color }];
-      let lx = obj.x;
-      for (const run of runs) {
-        ctx.fillStyle = run.color || obj.color;
-        ctx.fillText(run.text, lx, ly);
-        lx += ctx.measureText(run.text).width;
-      }
-    });
-    ctx.restore();
+      ctx.restore();
+    } else if (obj.type === 'text') {
+      if (obj.id === editingId) continue; // lo muestra el textarea de edición en vivo, no se pisa acá
+
+      ctx.font = fontString(obj);
+      ctx.textBaseline = 'top';
+      const { lines, lineHeight, width, height } = measureText(obj);
+
+      ctx.save();
+      ctx.globalAlpha = obj.opacity != null ? obj.opacity : 1;
+      drawTextBackground(obj, width, height);
+
+      lines.forEach((line, i) => {
+        const ly = obj.y + i * lineHeight;
+        if (obj.stroke) {
+          ctx.lineWidth = Math.max(2, obj.fontSize / 8);
+          ctx.strokeStyle = '#000000';
+          ctx.lineJoin = 'round';
+          ctx.strokeText(line, obj.x, ly);
+        }
+        // Cada tramo de color de la línea se dibuja por separado, uno al
+        // lado del otro, para que un carácter o palabra puntual pueda tener
+        // su propio color sin afectar al resto de la línea.
+        const runs = obj.lineRuns[i] || [{ text: line, color: obj.color }];
+        let lx = obj.x;
+        for (const run of runs) {
+          ctx.fillStyle = run.color || obj.color;
+          ctx.fillText(run.text, lx, ly);
+          lx += ctx.measureText(run.text).width;
+        }
+      });
+      ctx.restore();
+    }
   }
 
-  // 6) Recuadro punteado + tiradores de la capa activa (texto o imagen),
-  //    siempre nítidos, encima de todo.
-  const selectedObj = selectedId == null ? null : layers.find((o) => o.id === selectedId);
+  // 6) Recuadro punteado + tiradores de la capa activa (texto, imagen o
+  //    forma), siempre nítidos, encima de todo — salvo mientras esa misma
+  //    capa está en modo recorte, que en su lugar muestra el marco de
+  //    recorte (drawLayerCropOverlay, más abajo).
+  const selectedObj =
+    selectedId == null || selectedId === layerCropId
+      ? null
+      : layers.find((o) => o.id === selectedId);
   if (selectedObj) {
     const { width, height } = getBounds(selectedObj);
     ctx.save();
@@ -1876,6 +2438,7 @@ function draw() {
 
   drawMarginGuides();
   drawCropOverlay();
+  drawLayerCropOverlay();
   updateLayerControlsUI();
 }
 
@@ -2068,6 +2631,88 @@ function getCurrentLineDiv(overlay) {
 // Longitud de texto entre el inicio de una línea y un punto (container,
 // offset) dado — sirve tanto para el cursor como para los extremos de una
 // selección activa.
+// Mismo límite de 85 caracteres por línea que aplica el cuadro de texto
+// inicial (applyHardWrap más arriba), pero acá partiendo lineRuns (con
+// color por tramo) en vez de un string plano — la edición en vivo sobre
+// el lienzo usa un <div> por línea desde que se reescribió para poder
+// pintar cada línea de un color distinto mientras se escribe, y ese
+// límite nunca se trasladó a este otro camino: sin esto, escribir directo
+// sobre un texto ya puesto en la imagen se estira sin fin.
+function wrapLineRuns(runs, caretOffset) {
+  const out = [];
+  let remaining = runs;
+  let consumed = 0;
+  let restoreIdx = -1;
+  let restoreOffset = 0;
+  while (lineTextFromRuns(remaining).length > LINE_CHAR_LIMIT) {
+    const t = lineTextFromRuns(remaining);
+    let breakAt = t.lastIndexOf(' ', LINE_CHAR_LIMIT);
+    if (breakAt <= 0) breakAt = LINE_CHAR_LIMIT; // sin espacio: corte duro, último recurso
+    const head = sliceRuns(remaining, 0, breakAt);
+    const skipSpace = t[breakAt] === ' ' ? 1 : 0;
+    const restStart = breakAt + skipSpace;
+    out.push(head);
+    if (caretOffset !== -1 && restoreIdx === -1 && caretOffset <= consumed + breakAt) {
+      restoreIdx = out.length - 1;
+      restoreOffset = caretOffset - consumed;
+    }
+    remaining = sliceRuns(remaining, restStart, t.length);
+    consumed += restStart;
+  }
+  out.push(remaining);
+  if (caretOffset !== -1 && restoreIdx === -1) {
+    restoreIdx = out.length - 1;
+    restoreOffset = caretOffset - consumed;
+  }
+  return { out, restoreIdx, restoreOffset };
+}
+
+function enforceLineWrap(obj, overlay) {
+  const divs = lineDivs(overlay);
+  const current = getCurrentLineDiv(overlay);
+  const caretIdx = current ? divs.indexOf(current) : -1;
+  const caretOffset = caretIdx !== -1 ? getCaretOffsetInLine(current) : -1;
+
+  let changed = false;
+  const newLineRuns = [];
+  let restoreDivIdx = -1;
+  let restoreOffset = 0;
+
+  obj.lineRuns.forEach((runs, i) => {
+    if (lineTextFromRuns(runs).length <= LINE_CHAR_LIMIT) {
+      newLineRuns.push(runs);
+      if (i === caretIdx) {
+        restoreDivIdx = newLineRuns.length - 1;
+        restoreOffset = caretOffset;
+      }
+      return;
+    }
+    changed = true;
+    const { out, restoreIdx, restoreOffset: off } = wrapLineRuns(runs, i === caretIdx ? caretOffset : -1);
+    const baseIdx = newLineRuns.length;
+    newLineRuns.push(...out);
+    if (i === caretIdx) {
+      restoreDivIdx = baseIdx + restoreIdx;
+      restoreOffset = off;
+    }
+  });
+
+  if (!changed) return;
+
+  obj.lineRuns = newLineRuns;
+  overlay.innerHTML = '';
+  newLineRuns.forEach((runs) => {
+    const div = document.createElement('div');
+    div.className = 'edit-line';
+    renderLineRuns(div, runs, obj.color);
+    overlay.appendChild(div);
+  });
+  obj.text = lineDivs(overlay).map((d) => d.textContent).join('\n');
+  if (restoreDivIdx !== -1) {
+    setCaretInLine(lineDivs(overlay)[restoreDivIdx], Math.max(0, restoreOffset));
+  }
+}
+
 function offsetInLine(lineDiv, container, offsetInContainer) {
   const range = document.createRange();
   range.selectNodeContents(lineDiv);
@@ -2363,11 +3008,17 @@ function startInlineEdit(obj) {
   overlay.addEventListener('paste', (evt) => {
     evt.preventDefault();
     const text = (evt.clipboardData || window.clipboardData).getData('text/plain');
-    if (text) insertPlainText(obj, overlay, text);
+    if (text) {
+      insertPlainText(obj, overlay, text);
+      enforceLineWrap(obj, overlay);
+      positionOverlay(overlay, obj);
+      draw();
+    }
   });
 
   overlay.addEventListener('input', () => {
     syncTextFromOverlay(obj, overlay);
+    enforceLineWrap(obj, overlay);
     positionOverlay(overlay, obj);
     syncColorFromSelection(obj, overlay);
     draw();
@@ -2479,6 +3130,24 @@ canvas.addEventListener('mousedown', (evt) => {
     return;
   }
 
+  if (layerCropId != null) {
+    const obj = getLayerCropObj();
+    const bounds = obj ? { x: obj.x, y: obj.y, w: obj.width, h: obj.height } : null;
+    const handle = getLayerCropHandleAt(point);
+    if (handle) {
+      layerCropDragState = { type: 'resize', handle, origin: normalizeLayerCropRect(layerCropRect, bounds) };
+    } else if (pointInLayerCropBody(point)) {
+      // Arrastrar dentro del marco lo mueve (siempre dentro de los límites
+      // de la capa, que acá no se puede mover ni agrandar, solo recortar).
+      const r = normalizeLayerCropRect(layerCropRect, bounds);
+      layerCropDragState = { type: 'move', origin: r, offsetX: point.x - r.x, offsetY: point.y - r.y };
+    } else {
+      layerCropDragState = null;
+    }
+    draw();
+    return;
+  }
+
   // Si ya hay un texto seleccionado, el tirador de cualquier esquina tiene
   // prioridad para poder redimensionarlo desde ahí.
   if (selectedId != null) {
@@ -2565,6 +3234,7 @@ canvas.addEventListener('mousedown', (evt) => {
     layers.push(obj);
     selectedId = obj.id;
     textInput.value = '';
+    updateAddTextBtnVisibility();
     // Se apaga el modo "agregar" para que el siguiente clic seleccione o
     // arrastre el texto recién puesto, en vez de crear uno nuevo.
     setAddTextMode(false);
@@ -2578,6 +3248,7 @@ canvas.addEventListener('mousedown', (evt) => {
     pushHistory();
     dragState = { mode: 'move', id: hit.id, offsetX: point.x - hit.x, offsetY: point.y - hit.y };
     if (hit.type === 'text') syncToolbarToObject(hit);
+    else if (hit.type === 'shape') syncShapeToolbarToObject(hit);
   }
   draw();
 });
@@ -2618,11 +3289,50 @@ canvas.addEventListener('mousemove', (evt) => {
     return;
   }
 
+  if (layerCropId != null) {
+    const obj = getLayerCropObj();
+    if (!obj) return;
+    const bounds = { x: obj.x, y: obj.y, w: obj.width, h: obj.height };
+    if (layerCropDragState) {
+      if (layerCropDragState.type === 'resize') {
+        layerCropRect = resizeLayerCropRect(
+          layerCropDragState.origin,
+          layerCropDragState.handle,
+          point.x,
+          point.y,
+          bounds
+        );
+      } else if (layerCropDragState.type === 'move') {
+        const o = layerCropDragState.origin;
+        const x = Math.max(bounds.x, Math.min(bounds.x + bounds.w - o.w, point.x - layerCropDragState.offsetX));
+        const y = Math.max(bounds.y, Math.min(bounds.y + bounds.h - o.h, point.y - layerCropDragState.offsetY));
+        layerCropRect = { x, y, w: o.w, h: o.h };
+      }
+      draw();
+    } else {
+      const handle = getLayerCropHandleAt(point);
+      canvas.style.cursor = handle ? CROP_CURSORS[handle] : pointInLayerCropBody(point) ? 'move' : '';
+    }
+    return;
+  }
+
   if (!dragState) return;
   const obj = layers.find((o) => o.id === dragState.id);
   if (!obj) return;
 
   if (dragState.mode === 'resize') {
+    if (obj.type === 'shape') {
+      // Redimensionado libre (no proporcional): la esquina arrastrada
+      // sigue al mouse tal cual, la opuesta queda fija — así ancho y alto
+      // se pueden ajustar de forma totalmente independiente.
+      const anchor = dragState.anchor;
+      obj.width = Math.max(MIN_IMAGE_LAYER_SIZE, Math.abs(point.x - anchor.x));
+      obj.height = Math.max(MIN_IMAGE_LAYER_SIZE, Math.abs(point.y - anchor.y));
+      obj.x = Math.min(point.x, anchor.x);
+      obj.y = Math.min(point.y, anchor.y);
+      draw();
+      return;
+    }
     const currentDist = distanceBetween(dragState.anchor, point);
     const scale = currentDist / dragState.startDist;
     if (obj.type === 'image') {
@@ -2666,6 +3376,7 @@ window.addEventListener('mouseup', () => {
     canvas.style.cursor = 'grab';
   }
   cropDragState = null;
+  layerCropDragState = null;
 });
 
 window.addEventListener('resize', () => {
@@ -2698,7 +3409,7 @@ function deleteSelectedLayer() {
 // línea..."), para no interferir con el borrado normal de caracteres ahí.
 window.addEventListener('keydown', (evt) => {
   if (evt.key !== 'Delete') return;
-  if (selectedId == null || editingId != null) return;
+  if (selectedId == null || editingId != null || layerCropId != null) return;
   const tag = document.activeElement && document.activeElement.tagName;
   if (tag === 'INPUT' || tag === 'TEXTAREA' || (document.activeElement && document.activeElement.isContentEditable)) return;
   evt.preventDefault();
@@ -2709,6 +3420,7 @@ exportImageBtn.addEventListener('click', async () => {
   if (!image) return;
   commitInlineEdit();
   if (cropMode) setCropMode(false); // no exportar con el recorte pendiente de aplicar oscureciendo la imagen
+  if (layerCropId != null) cancelLayerCrop();
   const dataUrl = getCleanCanvasDataUrl();
   const name = `captura-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.png`;
   const result = await window.signalLog.saveImage(dataUrl, name);
@@ -2775,3 +3487,28 @@ function buildGuideControls() {
 }
 
 buildGuideControls();
+
+// Sliders con relleno propio (ver .dropdown-panel/input[type=range] en
+// styles.css): el CSS no puede leer solo el valor de un <input
+// type="range">, así que acá se calcula el % y se pone en la variable
+// --range-progress que el CSS usa para el gradiente de relleno.
+function updateRangeProgress(input) {
+  const min = Number(input.min || 0);
+  const max = Number(input.max || 100);
+  const val = Number(input.value);
+  const pct = max > min ? Math.min(100, Math.max(0, ((val - min) / (max - min)) * 100)) : 0;
+  input.style.setProperty('--range-progress', `${pct}%`);
+}
+function refreshAllRangeProgress() {
+  document.querySelectorAll('input[type="range"]').forEach(updateRangeProgress);
+}
+// Arrastrar el slider dispara 'input' normal — con esto alcanza para ese
+// caso. Cuando el valor se pone por código (deshacer, restablecer
+// efectos, seleccionar otra capa, etc.) no se dispara 'input' solo, así
+// que esos lugares llaman a refreshAllRangeProgress() a mano.
+document.addEventListener('input', (evt) => {
+  if (evt.target && evt.target.tagName === 'INPUT' && evt.target.type === 'range') {
+    updateRangeProgress(evt.target);
+  }
+});
+refreshAllRangeProgress();

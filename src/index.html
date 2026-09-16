@@ -131,14 +131,7 @@
           </div>
           <div class="dropdown-divider"></div>
           <div class="dropdown-label">Imagen dentro del recorte</div>
-          <label class="editor-field">
-            <span>Zoom</span>
-            <input type="range" id="cropZoomInput" min="10" max="400" value="100" disabled />
-            <span class="editor-field-value" id="cropZoomValue">100%</span>
-          </label>
           <button class="btn btn-ghost btn-block" id="cropResetImageBtn" type="button" disabled>Restablecer imagen</button>
-          <div class="dropdown-hint">Arrastrá dentro del marco para moverlo; afuera, para mover la imagen. Rueda del mouse: zoom.</div>
-          <div class="dropdown-hint">En los tiradores: Alt = redimensionar desde el centro · Shift = mantener proporción.</div>
         </div>
       </div>
 
@@ -151,7 +144,27 @@
         <span>Opacidad</span>
         <input type="range" id="layerOpacityInput" min="0" max="100" value="100" title="Opacidad de la capa" />
         <span class="editor-field-value" id="layerOpacityValue">100%</span>
+        <button class="btn btn-ghost btn-icon" id="layerCropBtn" type="button" title="Recortar esta imagen" hidden>✂</button>
+        <button class="btn btn-ghost btn-icon" id="layerCropApplyBtn" type="button" title="Aplicar recorte" hidden>✓</button>
+        <button class="btn btn-ghost btn-icon btn-danger" id="layerCropCancelBtn" type="button" title="Cancelar recorte" hidden>✕</button>
         <button class="btn btn-ghost btn-icon btn-danger" id="layerDeleteBtn" type="button" title="Eliminar capa seleccionada">🗑</button>
+      </div>
+
+      <div class="editor-field shape-controls" id="shapeControls" hidden>
+        <span>Forma</span>
+        <span class="shape-subfields" id="shapeRectFields">
+          <label class="chip"><input type="checkbox" id="shapeFillToggle" checked />Relleno</label>
+          <input type="color" id="shapeFillColorInput" value="#ffffff" title="Color de relleno" />
+          <label class="chip"><input type="checkbox" id="shapeStrokeToggle" checked />Borde</label>
+          <input type="color" id="shapeStrokeColorInput" value="#ffffff" title="Color de borde" />
+          <input type="range" id="shapeStrokeWidthInput" min="1" max="20" value="3" title="Grosor del borde" />
+          <span class="editor-field-value" id="shapeStrokeWidthValue">3px</span>
+        </span>
+        <span class="shape-subfields" id="shapeBlurFields" hidden>
+          <span>Intensidad</span>
+          <input type="range" id="shapeBlurAmountInput" min="2" max="40" value="14" title="Intensidad del desenfoque" />
+          <span class="editor-field-value" id="shapeBlurAmountValue">14px</span>
+        </span>
       </div>
 
       <div class="toolbar-spacer"></div>
@@ -165,8 +178,9 @@
         <input type="color" id="textColorInput" value="#ffffff" />
       </label>
 
-      <div class="swatches" id="colorSwatches" title="Clic: usar color · Clic derecho: quitar de la paleta"></div>
-      <button class="btn btn-ghost btn-swatch-add" id="addSwatchBtn" type="button" title="Guardar el color actual en la paleta">+ Color</button>
+      <div class="swatches" id="colorSwatches" title="Clic: usar color · Clic derecho: quitar de la paleta">
+        <button class="swatch-add" id="addSwatchBtn" type="button" title="Guardar el color actual en la paleta">+</button>
+      </div>
 
       <label class="editor-field">
         <span>Tamaño</span>
@@ -174,19 +188,20 @@
         <span class="editor-field-value" id="fontSizeValue">28px</span>
       </label>
 
-      <div class="swatches" id="sizePresets" title="Clic: usar tamaño · Clic derecho: quitar de la lista"></div>
-      <button class="btn btn-ghost btn-swatch-add" id="addSizePresetBtn" type="button" title="Guardar el tamaño actual como predeterminado">+ Tamaño</button>
+      <div class="swatches" id="sizePresets" title="Clic: usar tamaño · Clic derecho: quitar de la lista">
+        <button class="swatch-add swatch-add-size" id="addSizePresetBtn" type="button" title="Guardar el tamaño actual como predeterminado">+</button>
+      </div>
 
-      <label class="chip"><input type="checkbox" id="strokeToggle" checked />Contorno</label>
+      <label class="chip" id="strokeChip" hidden><input type="checkbox" id="strokeToggle" checked />Contorno</label>
 
-      <div class="editor-field bg-field" role="group" aria-label="Fondo del texto">
+      <div class="editor-field bg-field" id="textBgField" role="group" aria-label="Fondo del texto" hidden>
         <span>Fondo</span>
         <button class="seg-btn" id="bgNoneBtn" type="button" data-active="true">Ninguno</button>
         <button class="seg-btn" id="bgSolidBtn" type="button">Negro</button>
         <button class="seg-btn" id="bgSemiBtn" type="button">Semi</button>
       </div>
 
-      <button class="btn btn-ghost" id="addTextBtn" type="button" data-active="false">+ Añadir texto</button>
+      <button class="btn btn-ghost" id="addTextBtn" type="button" data-active="false" hidden>+ Añadir texto</button>
 
       <div class="toolbar-spacer"></div>
 
@@ -205,9 +220,17 @@
           </div>
           <canvas id="editorCanvas" hidden></canvas>
         </div>
+        <div class="canvas-zoom-controls" id="canvasZoomControls" hidden>
+          <button class="zoom-btn" id="zoomOutBtn" type="button" title="Alejar">−</button>
+          <button class="zoom-value" id="zoomValueBtn" type="button" title="Restablecer a 100%">100%</button>
+          <button class="zoom-btn" id="zoomInBtn" type="button" title="Acercar">+</button>
+          <span class="zoom-sep"></span>
+          <button class="zoom-btn zoom-fit-btn" id="zoomFitBtn" type="button" title="Ajustar a la ventana">⤢</button>
+        </div>
       </div>
 
-      <aside class="editor-effects">
+      <div class="editor-effects-wrap">
+        <aside class="editor-effects">
         <div class="effects-title">Efectos</div>
 
         <div class="effect-group">
@@ -292,7 +315,11 @@
         </div>
 
         <button class="btn btn-ghost effects-reset" id="resetEffectsBtn" type="button">Restablecer efectos</button>
-      </aside>
+        </aside>
+
+        <button class="btn btn-ghost btn-block" id="addRectBtn" type="button" title="Agregar un rectángulo" hidden>+ Rectángulo</button>
+        <button class="btn btn-ghost btn-block" id="addBlurBtn" type="button" title="Agregar un área con desenfoque, para tapar caras, placas u otro dato sensible" hidden>+ Desenfoque</button>
+      </div>
     </div>
   </main>
 
@@ -393,6 +420,7 @@
     <div class="modal inv-login-modal">
       <div class="modal-header">
         <div class="modal-title">Inventario protegido</div>
+        <button class="btn btn-ghost btn-icon" id="inventoryLoginCloseBtn" type="button" title="Cancelar">✕</button>
       </div>
       <div class="modal-body">
         <p class="inv-modal-copy">Ingresá la contraseña compartida para acceder al inventario.</p>
@@ -403,6 +431,7 @@
         <div class="inv-form-hint" id="inventoryLoginHint" hidden></div>
       </div>
       <div class="modal-footer">
+        <button class="btn btn-ghost" id="inventoryLoginCancelBtn" type="button">Cancelar</button>
         <div class="toolbar-spacer"></div>
         <button class="btn btn-primary" id="inventoryLoginBtn" type="button">Entrar</button>
       </div>
