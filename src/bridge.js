@@ -54,6 +54,9 @@
     parseAutosave: () => invoke('parse_load'),
     clearAutosave: () => invoke('chatlog_clear'),
 
+    getAutostart: () => invoke('autostart_get'),
+    setAutostart: (enabled) => invoke('autostart_set', { enabled }),
+
     checkForUpdates: () => invoke('check_for_updates'),
     installUpdate: () => invoke('install_update'),
     onUpdateProgress: (callback) => {

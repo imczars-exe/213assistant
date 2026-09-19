@@ -1,6 +1,6 @@
 {
   "name": "assistant213",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "private": true,
   "description": "213 Assistant — captura y edición de chatlog de rol (versión Tauri, portable).",
   "scripts": {

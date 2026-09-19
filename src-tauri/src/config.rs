@@ -23,11 +23,6 @@ pub struct AppConfig {
     pub filters: serde_json::Value,
     #[serde(default = "default_swatches")]
     pub color_swatches: Vec<String>,
-    /// `true` una vez que la app ya activó el inicio con Windows por primera
-    /// vez. Sirve para no volver a activarlo en cada arranque si el usuario
-    /// lo desactivó a propósito desde el menú de la bandeja.
-    #[serde(default)]
-    pub autostart_initialized: bool,
 }
 
 fn default_window_bounds() -> WindowBounds {
@@ -52,7 +47,6 @@ impl Default for AppConfig {
             last_image_export_dir: None,
             filters: serde_json::json!({}),
             color_swatches: default_swatches(),
-            autostart_initialized: false,
         }
     }
 }

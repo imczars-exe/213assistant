@@ -50,6 +50,40 @@ pub fn set_maximize_lock(app: AppHandle, lock: State<'_, MaximizeLock>, locked: 
     json!({ "ok": true })
 }
 
+// ---------------- inicio con Windows ----------------
+
+/// ¿Está activado el inicio automático con Windows?
+#[tauri::command]
+pub fn autostart_get(app: AppHandle) -> bool {
+    use tauri_plugin_autostart::ManagerExt;
+    app.autolaunch().is_enabled().unwrap_or(false)
+}
+
+/// Activa o desactiva el inicio automático. Devuelve el estado REAL final
+/// (`enabled`) para que la UI se sincronice aunque el registro haya fallado.
+#[tauri::command]
+pub fn autostart_set(app: AppHandle, enabled: bool) -> Value {
+    use tauri_plugin_autostart::ManagerExt;
+    let manager = app.autolaunch();
+    let result = if enabled { manager.enable() } else { manager.disable() };
+    let now_enabled = manager.is_enabled().unwrap_or(false);
+
+    // Mantener el tilde del menú de la bandeja igual al estado real.
+    if let Some(item) = app.try_state::<crate::TrayAutostartItem>() {
+        let _ = item.0.set_checked(now_enabled);
+    }
+
+    if now_enabled == enabled {
+        json!({ "ok": true, "enabled": now_enabled })
+    } else {
+        let error = match result {
+            Err(e) => e.to_string(),
+            Ok(()) => "el cambio no se aplicó".to_string(),
+        };
+        json!({ "ok": false, "enabled": now_enabled, "error": error })
+    }
+}
+
 // ---------------- portapapeles ----------------
 
 #[tauri::command]

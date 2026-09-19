@@ -187,6 +187,33 @@ header {
   background: #c23a4d;
 }
 
+/* Botón "Iniciar con Windows": apagado = ícono tenue y punto gris;
+   encendido = ícono claro y punto verde. */
+.win-btn-autostart {
+  position: relative;
+}
+
+.win-btn-autostart::after {
+  content: '';
+  position: absolute;
+  top: calc(50% - 9px);
+  right: 11px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--text-faint);
+  transition: background 0.12s var(--ease), box-shadow 0.12s var(--ease);
+}
+
+.win-btn-autostart[data-active="true"] {
+  color: var(--text);
+}
+
+.win-btn-autostart[data-active="true"]::after {
+  background: #7cc576;
+  box-shadow: 0 0 6px rgba(124, 197, 118, 0.7);
+}
+
 .win-btn:disabled {
   color: var(--text-faint);
   cursor: default;

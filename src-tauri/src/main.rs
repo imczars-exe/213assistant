@@ -2,7 +2,9 @@
 // Puerto 1:1 de la app original en Electron/Node: misma UI, mismos contratos
 // de la API interna del bridge (window.signalLog), motor de captura CDP
 // reescrito en Rust.
-#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+// Sin consola en Windows, también en builds de debug: así, si el inicio
+// automático apunta a un exe de debug, no se abre ninguna ventana de comandos.
+#![windows_subsystem = "windows"]
 
 mod capture;
 mod commands;
@@ -37,6 +39,10 @@ pub type MaximizeLock = Arc<AtomicBool>;
 /// aparecer maximizada encima de todo apenas se enciende la PC.
 const AUTOSTART_ARG: &str = "--minimized";
 
+/// Guarda el ítem "Iniciar con Windows" del menú de la bandeja para poder
+/// actualizar su tilde cuando el usuario cambia la opción desde la app.
+pub struct TrayAutostartItem(pub CheckMenuItem<tauri::Wry>);
+
 /// Trae la ventana principal al frente (la restaura si estaba minimizada u
 /// oculta en la bandeja).
 fn show_main_window(app: &tauri::AppHandle) {
@@ -61,6 +67,7 @@ fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
         autostart_on,
         None::<&str>,
     )?;
+    app.manage(TrayAutostartItem(autostart_item.clone()));
     let separator = PredefinedMenuItem::separator(app)?;
     let quit_item = MenuItem::with_id(app, "quit", "Salir", true, None::<&str>)?;
     let menu = Menu::with_items(app, &[&open_item, &autostart_item, &separator, &quit_item])?;
@@ -162,18 +169,24 @@ fn main() {
             commands::set_maximize_lock,
             commands::check_for_updates,
             commands::install_update,
+            commands::autostart_get,
+            commands::autostart_set,
             frontend_ready,
         ])
         .setup(|app| {
             let handle = app.handle().clone();
-            let mut cfg = config::load_config(&handle);
+            let cfg = config::load_config(&handle);
 
-            // Primer arranque: activar el inicio con Windows por defecto. Si
-            // después lo desactivás desde la bandeja, no se vuelve a activar.
-            if !cfg.autostart_initialized {
-                let _ = app.autolaunch().enable();
-                cfg.autostart_initialized = true;
-                config::save_config(&handle, &cfg);
+            // Inicio con Windows: viene DESACTIVADO por defecto; se activa con
+            // el botón de la barra superior o desde el menú de la bandeja.
+            // Solo en builds de release y solo si ya estaba activado: se
+            // reescribe la entrada para que apunte SIEMPRE al exe que está
+            // corriendo ahora (por si antes apuntaba a otro build o carpeta).
+            if !cfg!(debug_assertions) {
+                let autostart = app.autolaunch();
+                if autostart.is_enabled().unwrap_or(false) {
+                    let _ = autostart.enable();
+                }
             }
 
             setup_tray(app)?;

@@ -214,6 +214,50 @@ stripTimestampToggle.addEventListener('change', (event) => {
   window.signalLog.setFilters({ ...activeFilters, stripChatTimestamps });
 });
 
+// ---- inicio con Windows ----
+
+const autostartBtn = document.getElementById('autostartBtn');
+
+function setAutostartBtn(enabled) {
+  autostartBtn.dataset.active = enabled ? 'true' : 'false';
+  autostartBtn.setAttribute('aria-pressed', enabled ? 'true' : 'false');
+  autostartBtn.title = enabled
+    ? 'Iniciar con Windows: activado (clic para desactivar)'
+    : 'Iniciar con Windows: desactivado (clic para activar)';
+}
+
+async function refreshAutostartBtn() {
+  try {
+    setAutostartBtn(!!(await window.signalLog.getAutostart()));
+  } catch (_) {
+    /* si falla, dejamos el estado anterior */
+  }
+}
+
+autostartBtn.addEventListener('click', async () => {
+  const wanted = autostartBtn.dataset.active !== 'true';
+  autostartBtn.disabled = true;
+  try {
+    const result = await window.signalLog.setAutostart(wanted);
+    setAutostartBtn(!!(result && result.enabled));
+    if (result && !result.ok) {
+      await window.signalLogAlert(
+        `No se pudo ${wanted ? 'activar' : 'desactivar'} el inicio con Windows: ${result.error || 'error desconocido'}`,
+        { title: '213 Assistant', kind: 'error' }
+      );
+    }
+  } catch (err) {
+    console.error('[autostart] excepción:', err);
+  } finally {
+    autostartBtn.disabled = false;
+  }
+});
+
+// Si se cambió desde el menú de la bandeja mientras la ventana estaba
+// oculta, al volver a enfocarla se resincroniza.
+window.addEventListener('focus', refreshAutostartBtn);
+refreshAutostartBtn();
+
 searchInput.addEventListener('input', (event) => {
   searchQuery = event.target.value.trim().toLowerCase();
   reapplyFilters();

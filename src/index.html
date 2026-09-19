@@ -13,7 +13,7 @@
         <img src="logo2.png" alt="213 Assistant" />
       </div>
       <div>213 Assistant</div>
-      <span class="version-badge">v1.0.4</span>
+      <span class="version-badge">v1.0.5</span>
     </div>
     <nav class="tabs" id="viewTabs">
       <button class="tab" data-view="chat" type="button" data-active="true">Chatlog</button>
@@ -23,6 +23,14 @@
     <button class="btn btn-ghost update-btn" id="updateBtn" type="button" style="display: none;"></button>
     <div class="header-spacer"></div>
     <div class="window-controls">
+      <button class="win-btn win-btn-autostart" id="autostartBtn" type="button" data-active="false" aria-pressed="false" title="Iniciar con Windows: desactivado" aria-label="Iniciar con Windows">
+        <svg viewBox="0 0 10 10" width="10" height="10">
+          <path
+            d="M5 1v3.6M2.9 2.7a3.5 3.5 0 1 0 4.2 0"
+            fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+          />
+        </svg>
+      </button>
       <button class="win-btn" id="checkUpdateBtn" type="button" title="Buscar actualizaciones" aria-label="Buscar actualizaciones">
         <svg viewBox="0 0 10 10" width="10" height="10">
           <path
