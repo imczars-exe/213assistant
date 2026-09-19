@@ -50,8 +50,19 @@ pub fn spawn() {
         loop {
             if client.is_none() {
                 let mut c = DiscordIpcClient::new(DISCORD_CLIENT_ID);
-                if c.connect().is_ok() && c.set_activity(build_activity(started_at_secs)).is_ok() {
-                    client = Some(c);
+                match c.connect() {
+                    Ok(()) => match c.set_activity(build_activity(started_at_secs)) {
+                        Ok(()) => {
+                            eprintln!("[discord] actividad puesta OK");
+                            client = Some(c);
+                        }
+                        Err(err) => {
+                            eprintln!("[discord] connect() OK pero set_activity() falló: {err}");
+                        }
+                    },
+                    Err(err) => {
+                        eprintln!("[discord] connect() falló (¿Discord no está corriendo o el pipe no está disponible?): {err}");
+                    }
                 }
             } else if let Some(c) = client.as_mut() {
                 // Ya conectado: re-mandar la misma actividad de vez en
@@ -59,7 +70,8 @@ pub fn spawn() {
                 // en el medio — soltamos el cliente para reconectar de cero
                 // en la próxima vuelta, en vez de quedar mandando a un pipe
                 // muerto para siempre.
-                if c.set_activity(build_activity(started_at_secs)).is_err() {
+                if let Err(err) = c.set_activity(build_activity(started_at_secs)) {
+                    eprintln!("[discord] se perdió la conexión, reintentando: {err}");
                     client = None;
                 }
             }
