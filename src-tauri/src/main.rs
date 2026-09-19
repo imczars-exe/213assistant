@@ -13,7 +13,12 @@ mod inventory;
 use capture::CaptureManager;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use tauri::{Manager, WindowEvent};
+use tauri::{
+    menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem},
+    tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
+    Manager, WindowEvent,
+};
+use tauri_plugin_autostart::{MacosLauncher, ManagerExt};
 
 // Tamaño mínimo de la ventana (en píxeles lógicos) — aplica siempre: al
 // restaurar desde maximizado, al arrastrar los bordes, y al arrancar. Ajustá
@@ -26,6 +31,78 @@ const MIN_WINDOW_HEIGHT: f64 = 660.0;
 /// Es el mismo `Arc<AtomicBool>` que se registra con `.manage()` y que
 /// `commands::set_maximize_lock` y el handler de `Resized` de abajo comparten.
 pub type MaximizeLock = Arc<AtomicBool>;
+
+/// Argumento con el que Windows lanza la app al iniciar sesión. Si está
+/// presente, la ventana arranca oculta (solo bandeja del sistema) en vez de
+/// aparecer maximizada encima de todo apenas se enciende la PC.
+const AUTOSTART_ARG: &str = "--minimized";
+
+/// Trae la ventana principal al frente (la restaura si estaba minimizada u
+/// oculta en la bandeja).
+fn show_main_window(app: &tauri::AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.unminimize();
+        let _ = window.show();
+        let _ = window.set_focus();
+    }
+}
+
+/// Ícono en la bandeja del sistema: clic izquierdo abre la ventana; clic
+/// derecho muestra el menú (Abrir / Iniciar con Windows / Salir).
+fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
+    let autostart_on = app.autolaunch().is_enabled().unwrap_or(false);
+
+    let open_item = MenuItem::with_id(app, "open", "Abrir 213 Assistant", true, None::<&str>)?;
+    let autostart_item = CheckMenuItem::with_id(
+        app,
+        "autostart",
+        "Iniciar con Windows",
+        true,
+        autostart_on,
+        None::<&str>,
+    )?;
+    let separator = PredefinedMenuItem::separator(app)?;
+    let quit_item = MenuItem::with_id(app, "quit", "Salir", true, None::<&str>)?;
+    let menu = Menu::with_items(app, &[&open_item, &autostart_item, &separator, &quit_item])?;
+
+    let autostart_for_menu = autostart_item.clone();
+    let mut tray = TrayIconBuilder::with_id("main")
+        .tooltip("213 Assistant")
+        .menu(&menu)
+        .show_menu_on_left_click(false)
+        .on_menu_event(move |app, event| match event.id.as_ref() {
+            "open" => show_main_window(app),
+            "autostart" => {
+                let manager = app.autolaunch();
+                if manager.is_enabled().unwrap_or(false) {
+                    let _ = manager.disable();
+                } else {
+                    let _ = manager.enable();
+                }
+                // Reflejar el estado real (por si el registro falló).
+                let _ = autostart_for_menu.set_checked(manager.is_enabled().unwrap_or(false));
+            }
+            // Única forma de cerrar la app de verdad (la X solo la oculta).
+            "quit" => app.exit(0),
+            _ => {}
+        })
+        .on_tray_icon_event(|tray, event| {
+            if let TrayIconEvent::Click {
+                button: MouseButton::Left,
+                button_state: MouseButtonState::Up,
+                ..
+            } = event
+            {
+                show_main_window(tray.app_handle());
+            }
+        });
+
+    if let Some(icon) = app.default_window_icon() {
+        tray = tray.icon(icon.clone());
+    }
+    tray.build(app)?;
+    Ok(())
+}
 
 fn main() {
     tauri::Builder::default()
@@ -45,6 +122,13 @@ fn main() {
                 let _ = window.set_focus();
             }
         }))
+        // Inicio con Windows: escribe la entrada en el registro del usuario
+        // (HKCU\...\Run). Lanza la app con `--minimized` para que arranque
+        // directo a la bandeja.
+        .plugin(tauri_plugin_autostart::init(
+            MacosLauncher::LaunchAgent,
+            Some(vec![AUTOSTART_ARG]),
+        ))
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_shell::init())
@@ -82,7 +166,17 @@ fn main() {
         ])
         .setup(|app| {
             let handle = app.handle().clone();
-            let cfg = config::load_config(&handle);
+            let mut cfg = config::load_config(&handle);
+
+            // Primer arranque: activar el inicio con Windows por defecto. Si
+            // después lo desactivás desde la bandeja, no se vuelve a activar.
+            if !cfg.autostart_initialized {
+                let _ = app.autolaunch().enable();
+                cfg.autostart_initialized = true;
+                config::save_config(&handle, &cfg);
+            }
+
+            setup_tray(app)?;
 
             // Actividad fija en Discord ("Haciendo relatos") mientras la
             // app esté abierta — ver discord.rs.
@@ -111,11 +205,30 @@ fn main() {
                     (cfg.window_bounds.height as f64).max(MIN_WINDOW_HEIGHT),
                 ));
                 let _ = window.maximize();
-                let _ = window.show();
+
+                // Si Windows nos lanzó al iniciar sesión, nos quedamos en la
+                // bandeja; si el usuario abrió la app a mano, mostramos la
+                // ventana como siempre.
+                let started_by_autostart = std::env::args().any(|a| a == AUTOSTART_ARG);
+                if !started_by_autostart {
+                    let _ = window.show();
+                }
 
                 let handle_for_resize = handle.clone();
                 let maximize_lock: MaximizeLock = app.state::<MaximizeLock>().inner().clone();
                 window.on_window_event(move |event| {
+                    // La X (o Alt+F4) no cierra la app: oculta la ventana y
+                    // deja todo corriendo en segundo plano (captura, autosave
+                    // del chatlog, etc.). Para salir de verdad: menú de la
+                    // bandeja → Salir.
+                    if let WindowEvent::CloseRequested { api, .. } = event {
+                        api.prevent_close();
+                        if let Some(win) = handle_for_resize.get_webview_window("main") {
+                            let _ = win.hide();
+                        }
+                        return;
+                    }
+
                     if let WindowEvent::Resized(_) = event {
                         if let Some(win) = handle_for_resize.get_webview_window("main") {
                             let is_maxed = win.is_maximized().unwrap_or(false);
