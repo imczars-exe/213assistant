@@ -6,6 +6,7 @@ dist/
 
 # Build de Rust/Tauri — esto es lo que pesa los 8GB, se regenera solo
 src-tauri/target/
+signal-log-tauri-inventario.zip
 
 # Llaves de firma del updater — NUNCA subir la privada a GitHub
 *.key
