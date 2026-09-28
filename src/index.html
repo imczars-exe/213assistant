@@ -13,11 +13,12 @@
         <img src="logo2.png" alt="213 Assistant" />
       </div>
       <div>213 Assistant</div>
-      <span class="version-badge">v1.0.5</span>
+      <span class="version-badge">v1.0.8</span>
     </div>
     <nav class="tabs" id="viewTabs">
       <button class="tab" data-view="chat" type="button" data-active="true">Chatlog</button>
       <button class="tab" data-view="editor" type="button">Editor de capturas</button>
+      <button class="tab" data-view="gif" type="button">GIFs</button>
       <button class="tab" data-view="inventory" type="button">Inventario</button>
     </nav>
     <button class="btn btn-ghost update-btn" id="updateBtn" type="button" style="display: none;"></button>
@@ -160,6 +161,12 @@
 
       <div class="editor-field shape-controls" id="shapeControls" hidden>
         <span>Forma</span>
+        <span class="shape-subfields">
+          <span>Ángulo</span>
+          <input type="number" id="shapeRotationInput" class="editor-number shape-rotation-input" min="-180" max="180" step="1" value="0" title="Ángulo de giro (también puedes girarla arrastrando el círculo que aparece sobre la forma)" />
+          <span class="editor-field-value">°</span>
+          <button class="btn btn-ghost btn-icon" id="shapeRotationResetBtn" type="button" title="Quitar giro">↺</button>
+        </span>
         <span class="shape-subfields" id="shapeRectFields">
           <label class="chip"><input type="checkbox" id="shapeFillToggle" checked />Relleno</label>
           <input type="color" id="shapeFillColorInput" value="#ffffff" title="Color de relleno" />
@@ -245,42 +252,128 @@
           <label class="effect-header">
             <input type="checkbox" id="grainToggle" />
             <span>Grano</span>
-            <span class="effect-value" id="grainIntensityValue">0%</span>
           </label>
-          <input type="range" id="grainIntensityInput" min="0" max="100" value="0" />
+          <div class="effect-fields" id="grainFields" hidden>
+            <div class="effect-subrow">
+              <span class="effect-sublabel">Intensidad</span>
+              <input type="range" id="grainIntensityInput" min="0" max="100" value="0" />
+              <span class="effect-value" id="grainIntensityValue">0%</span>
+            </div>
+          </div>
         </div>
 
         <div class="effect-group">
           <label class="effect-header">
             <input type="checkbox" id="blurToggle" />
             <span>Desenfoque</span>
-            <span class="effect-value" id="blurIntensityValue">0px</span>
           </label>
-          <input type="range" id="blurIntensityInput" min="0" max="20" value="0" step="0.5" />
+          <div class="effect-fields" id="blurFields" hidden>
+            <div class="effect-subrow">
+              <span class="effect-sublabel">Tipo</span>
+              <select id="blurTypeSelect" class="effect-select" title="Tipo de desenfoque">
+                <option value="gaussian">Gaussiano</option>
+                <option value="motion">Movimiento</option>
+              </select>
+            </div>
+            <div class="effect-fields" id="blurGaussianFields">
+              <div class="effect-subrow">
+                <span class="effect-sublabel">Intensidad</span>
+                <input type="range" id="blurIntensityInput" min="0" max="20" value="0" step="0.5" />
+                <span class="effect-value" id="blurIntensityValue">0px</span>
+              </div>
+            </div>
+            <div class="effect-fields" id="blurMotionFields" hidden>
+              <div class="effect-subrow">
+                <span class="effect-sublabel">Distancia</span>
+                <input type="range" id="motionBlurDistanceInput" min="0" max="150" value="0" />
+                <span class="effect-value" id="motionBlurDistanceValue">0px</span>
+              </div>
+              <div class="effect-subrow">
+                <span class="effect-sublabel">Ángulo</span>
+                <div
+                  class="angle-dial"
+                  id="motionBlurAngleDial"
+                  role="slider"
+                  tabindex="0"
+                  aria-label="Ángulo del desenfoque de movimiento"
+                  aria-valuemin="-180"
+                  aria-valuemax="180"
+                  aria-valuenow="0"
+                  title="Arrastra para girar (o usa las flechas)"
+                >
+                  <div class="angle-dial-needle" id="motionBlurAngleNeedle"></div>
+                </div>
+                <input type="number" id="motionBlurAngleInput" class="angle-number" min="-180" max="180" step="1" value="0" />
+                <span class="effect-unit">°</span>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div class="effect-group">
           <label class="effect-header">
+            <input type="checkbox" id="saturationToggle" />
             <span>Saturación</span>
-            <span class="effect-value" id="saturationValue">100%</span>
           </label>
-          <input type="range" id="saturationInput" min="0" max="200" value="100" />
+          <div class="effect-fields" id="saturationFields" hidden>
+            <div class="effect-subrow">
+              <span class="effect-sublabel">Nivel</span>
+              <input type="range" id="saturationInput" min="0" max="200" value="100" />
+              <span class="effect-value" id="saturationValue">100%</span>
+            </div>
+          </div>
         </div>
 
         <div class="effect-group">
           <label class="effect-header">
+            <input type="checkbox" id="brightnessToggle" />
             <span>Brillo</span>
-            <span class="effect-value" id="brightnessValue">100%</span>
           </label>
-          <input type="range" id="brightnessInput" min="0" max="200" value="100" />
+          <div class="effect-fields" id="brightnessFields" hidden>
+            <div class="effect-subrow">
+              <span class="effect-sublabel">Nivel</span>
+              <input type="range" id="brightnessInput" min="0" max="200" value="100" />
+              <span class="effect-value" id="brightnessValue">100%</span>
+            </div>
+          </div>
         </div>
 
         <div class="effect-group">
           <label class="effect-header">
+            <input type="checkbox" id="contrastToggle" />
             <span>Contraste</span>
-            <span class="effect-value" id="contrastValue">100%</span>
           </label>
-          <input type="range" id="contrastInput" min="0" max="200" value="100" />
+          <div class="effect-fields" id="contrastFields" hidden>
+            <div class="effect-subrow">
+              <span class="effect-sublabel">Nivel</span>
+              <input type="range" id="contrastInput" min="0" max="200" value="100" />
+              <span class="effect-value" id="contrastValue">100%</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="effect-group">
+          <label class="effect-header">
+            <input type="checkbox" id="bloomToggle" />
+            <span>Bloom</span>
+          </label>
+          <div class="effect-fields" id="bloomFields" hidden>
+            <div class="effect-subrow">
+              <span class="effect-sublabel">Umbral</span>
+              <input type="range" id="bloomThresholdInput" min="0" max="100" value="70" />
+              <span class="effect-value" id="bloomThresholdValue">70%</span>
+            </div>
+            <div class="effect-subrow">
+              <span class="effect-sublabel">Intensidad</span>
+              <input type="range" id="bloomIntensityInput" min="0" max="100" value="50" />
+              <span class="effect-value" id="bloomIntensityValue">50%</span>
+            </div>
+            <div class="effect-subrow">
+              <span class="effect-sublabel">Radio</span>
+              <input type="range" id="bloomRadiusInput" min="0" max="50" value="15" />
+              <span class="effect-value" id="bloomRadiusValue">15px</span>
+            </div>
+          </div>
         </div>
 
         <div class="effect-group">
@@ -292,33 +385,108 @@
 
         <div class="effect-group">
           <label class="effect-header">
+            <input type="checkbox" id="duotoneToggle" />
+            <span>Duotono</span>
+          </label>
+          <div class="effect-fields" id="duotoneFields" hidden>
+            <div class="effect-subrow">
+              <span class="effect-sublabel">Sombras</span>
+              <input type="color" id="duotoneShadowInput" class="effect-color" value="#0b1e3f" title="Color de las sombras" />
+            </div>
+            <div class="effect-subrow">
+              <span class="effect-sublabel">Luces</span>
+              <input type="color" id="duotoneLightInput" class="effect-color" value="#ff9a3c" title="Color de las luces" />
+            </div>
+            <div class="effect-subrow">
+              <span class="effect-sublabel">Intensidad</span>
+              <input type="range" id="duotoneIntensityInput" min="0" max="100" value="100" />
+              <span class="effect-value" id="duotoneIntensityValue">100%</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="effect-group">
+          <label class="effect-header">
+            <input type="checkbox" id="vignetteToggle" />
+            <span>Viñeta</span>
+          </label>
+          <div class="effect-fields" id="vignetteFields" hidden>
+            <div class="effect-subrow">
+              <span class="effect-sublabel">Intensidad</span>
+              <input type="range" id="vignetteIntensityInput" min="0" max="100" value="60" />
+              <span class="effect-value" id="vignetteIntensityValue">60%</span>
+            </div>
+            <div class="effect-subrow">
+              <span class="effect-sublabel">Tamaño</span>
+              <input type="range" id="vignetteSizeInput" min="0" max="100" value="50" />
+              <span class="effect-value" id="vignetteSizeValue">50%</span>
+            </div>
+            <div class="effect-subrow">
+              <span class="effect-sublabel">Color</span>
+              <input type="color" id="vignetteColorInput" class="effect-color" value="#000000" title="Color de la viñeta" />
+            </div>
+          </div>
+        </div>
+
+        <div class="effect-group">
+          <label class="effect-header">
+            <input type="checkbox" id="cctvToggle" />
+            <span>Cámara de seguridad</span>
+          </label>
+          <div class="effect-fields" id="cctvFields" hidden>
+            <div class="effect-subrow">
+              <span class="effect-sublabel">Intensidad</span>
+              <input type="range" id="cctvIntensityInput" min="0" max="100" value="70" />
+              <span class="effect-value" id="cctvIntensityValue">70%</span>
+            </div>
+            <label class="effect-subcheck">
+              <input type="checkbox" id="cctvOsdToggle" checked />
+              <span>Datos en pantalla</span>
+            </label>
+            <div class="effect-fields" id="cctvOsdFields">
+              <label class="effect-stack">
+                <span class="effect-sublabel">Cámara</span>
+                <input type="text" id="cctvCameraInput" class="effect-text" value="CAM 01" maxlength="24" spellcheck="false" autocomplete="off" />
+              </label>
+              <label class="effect-stack">
+                <span class="effect-sublabel">Fecha y hora</span>
+                <input type="text" id="cctvTimeInput" class="effect-text" placeholder="dd/mm/aaaa hh:mm:ss" maxlength="24" spellcheck="false" autocomplete="off" />
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div class="effect-group">
+          <label class="effect-header">
             <input type="checkbox" id="ghostToggle" />
             <span>Efecto fantasma</span>
           </label>
-          <div class="effect-subrow">
-            <span class="effect-sublabel">Desplaz. X</span>
-            <input type="range" id="ghostOffsetXInput" min="-150" max="150" value="0" />
-            <span class="effect-value" id="ghostOffsetXValue">0px</span>
-          </div>
-          <div class="effect-subrow">
-            <span class="effect-sublabel">Desplaz. Y</span>
-            <input type="range" id="ghostOffsetYInput" min="-150" max="150" value="0" />
-            <span class="effect-value" id="ghostOffsetYValue">0px</span>
-          </div>
-          <div class="effect-subrow">
-            <span class="effect-sublabel">Opacidad</span>
-            <input type="range" id="ghostOpacityInput" min="0" max="90" value="0" />
-            <span class="effect-value" id="ghostOpacityValue">0%</span>
-          </div>
-          <div class="effect-subrow">
-            <span class="effect-sublabel">Difuminado</span>
-            <input type="range" id="ghostBlurInput" min="0" max="20" value="0" step="0.5" />
-            <span class="effect-value" id="ghostBlurValue">0px</span>
-          </div>
-          <div class="effect-subrow">
-            <span class="effect-sublabel">Zoom</span>
-            <input type="range" id="ghostZoomInput" min="0" max="200" value="0" />
-            <span class="effect-value" id="ghostZoomValue">100%</span>
+          <div class="effect-fields" id="ghostFields" hidden>
+            <div class="effect-subrow">
+              <span class="effect-sublabel">Desplaz. X</span>
+              <input type="range" id="ghostOffsetXInput" min="-150" max="150" value="0" />
+              <span class="effect-value" id="ghostOffsetXValue">0px</span>
+            </div>
+            <div class="effect-subrow">
+              <span class="effect-sublabel">Desplaz. Y</span>
+              <input type="range" id="ghostOffsetYInput" min="-150" max="150" value="0" />
+              <span class="effect-value" id="ghostOffsetYValue">0px</span>
+            </div>
+            <div class="effect-subrow">
+              <span class="effect-sublabel">Opacidad</span>
+              <input type="range" id="ghostOpacityInput" min="0" max="90" value="0" />
+              <span class="effect-value" id="ghostOpacityValue">0%</span>
+            </div>
+            <div class="effect-subrow">
+              <span class="effect-sublabel">Difuminado</span>
+              <input type="range" id="ghostBlurInput" min="0" max="20" value="0" step="0.5" />
+              <span class="effect-value" id="ghostBlurValue">0px</span>
+            </div>
+            <div class="effect-subrow">
+              <span class="effect-sublabel">Zoom</span>
+              <input type="range" id="ghostZoomInput" min="0" max="200" value="0" />
+              <span class="effect-value" id="ghostZoomValue">100%</span>
+            </div>
           </div>
         </div>
 
@@ -422,6 +590,90 @@
         <div class="cash-list" id="cashList" hidden></div>
       </div>
     </section>
+  </main>
+
+  <main class="applayout view" id="gifView" data-view-id="gif">
+    <div class="editor-toolbar">
+      <button class="btn btn-ghost" id="gifOpenVideoBtn" type="button">Abrir video</button>
+      <span class="gif-filename" id="gifFileName"></span>
+      <div class="toolbar-spacer"></div>
+      <span class="gif-crop-applied-label" id="gifCropAppliedLabel" hidden></span>
+      <button class="btn btn-ghost btn-icon" id="gifCropToggleBtn" type="button" title="Dibujar recorte sobre el video" hidden>✂</button>
+      <label class="editor-field gif-crop-size-field" id="gifCropWidthField" hidden>
+        <span>Ancho</span>
+        <input type="number" id="gifCropWidthInput" class="editor-number" min="2" />
+      </label>
+      <label class="editor-field gif-crop-size-field" id="gifCropHeightField" hidden>
+        <span>Alto</span>
+        <input type="number" id="gifCropHeightInput" class="editor-number" min="2" />
+      </label>
+      <button class="btn btn-ghost" id="gifCropPreset1080Btn" type="button" hidden>1080×1080</button>
+      <button class="btn btn-primary" id="gifCropApplyBtn" type="button" hidden>Aplicar recorte</button>
+      <button class="btn btn-ghost" id="gifCropCancelBtn" type="button" hidden>Cancelar</button>
+      <button class="btn btn-ghost" id="gifCropResetBtn" type="button" hidden>Quitar recorte</button>
+    </div>
+
+    <div class="gif-workspace" id="gifWorkspace" hidden>
+      <div class="gif-video-pane">
+        <div class="gif-video-stage" id="gifVideoStage">
+          <video id="gifVideo" preload="metadata"></video>
+          <div class="gif-crop-box" id="gifCropBox" hidden>
+            <div class="gif-crop-handle" data-handle="nw"></div>
+            <div class="gif-crop-handle" data-handle="ne"></div>
+            <div class="gif-crop-handle" data-handle="sw"></div>
+            <div class="gif-crop-handle" data-handle="se"></div>
+          </div>
+        </div>
+        <div class="gif-player-bar">
+          <button class="gif-pb-btn" id="gifPlayBtn" type="button" title="Reproducir / pausar el tramo elegido"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l13-7.5z"/></svg></button>
+          <div class="gif-volume-wrap">
+            <button class="gif-pb-btn" id="gifMuteBtn" type="button" title="Silenciar / activar sonido"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9.5v5h4l5 4.5v-14L7 9.5zM15.5 8.5a5 5 0 0 1 0 7l-1.4-1.4a3 3 0 0 0 0-4.2zM18.4 5.6a9 9 0 0 1 0 12.8l-1.4-1.4a7 7 0 0 0 0-10z"/></svg></button>
+            <input type="range" id="gifVolumeInput" class="gif-volume" min="0" max="100" value="100" title="Volumen" />
+          </div>
+          <span class="gif-time" id="gifCurrentLabel">00:00.00</span>
+          <div class="gif-trim-track" id="gifTrimTrack">
+            <div class="gif-trim-line"></div>
+            <div class="gif-trim-range" id="gifTrimRange"></div>
+            <div class="gif-trim-handle" data-trim="start" id="gifTrimStartHandle"></div>
+            <div class="gif-trim-handle" data-trim="end" id="gifTrimEndHandle"></div>
+            <div class="gif-trim-playhead" id="gifPlayhead"></div>
+          </div>
+          <span class="gif-time gif-time-total" id="gifTotalLabel">00:00.00</span>
+        </div>
+        <div class="gif-trim-hint">Arrastrá los extremos rojos para elegir el tramo del GIF. Inicio <strong id="gifStartLabel">00:00.00</strong> · Fin <strong id="gifEndLabel">00:00.00</strong> · Duración del GIF <strong id="gifDurationLabel">0.0s</strong></div>
+      </div>
+
+      <div class="gif-controls-pane">
+        <div class="gif-fields-row">
+          <label class="editor-field">
+            <span>FPS</span>
+            <input type="number" id="gifFpsInput" class="editor-number" min="1" max="50" value="15" />
+          </label>
+          <label class="editor-field" title="Velocidad (×)">
+            <span>Vel. ×</span>
+            <input type="number" id="gifSpeedInput" class="editor-number" min="0.1" max="8" step="0.25" value="1" />
+          </label>
+        </div>
+        <label class="editor-field gif-quality-field">
+          <span>Calidad</span>
+          <input type="range" id="gifQualityInput" min="1" max="100" value="100" />
+          <span class="editor-field-value" id="gifQualityValue">100</span>
+        </label>
+
+        <button class="btn btn-primary btn-block" id="gifGenerateBtn" type="button">Generar GIF</button>
+        <div class="gif-status" id="gifStatus" hidden></div>
+
+        <div class="gif-preview" id="gifPreview" hidden>
+          <img id="gifPreviewImg" alt="Vista previa del GIF" />
+          <div class="gif-preview-meta" id="gifPreviewMeta"></div>
+          <button class="btn btn-primary btn-block" id="gifSaveBtn" type="button">Guardar como…</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="gif-empty" id="gifEmpty">
+      Abrí un video (mp4, mov, mkv, webm) para empezar.
+    </div>
   </main>
 
   <div class="modal-overlay inv-lock-overlay" id="inventoryLoginOverlay" hidden>
@@ -561,6 +813,8 @@
   <script src="bridge.js"></script>
   <script src="renderer.js"></script>
   <script src="editor.js"></script>
+  <script src="themed-controls.js"></script>
   <script src="inventory.js"></script>
+  <script src="gif.js"></script>
 </body>
 </html>

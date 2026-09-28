@@ -60,6 +60,8 @@ const layerCropCancelBtn = document.getElementById('layerCropCancelBtn');
 
 const shapeControlsEl = document.getElementById('shapeControls');
 const shapeRectFieldsEl = document.getElementById('shapeRectFields');
+const shapeRotationInput = document.getElementById('shapeRotationInput');
+const shapeRotationResetBtn = document.getElementById('shapeRotationResetBtn');
 const shapeFillToggle = document.getElementById('shapeFillToggle');
 const shapeFillColorInput = document.getElementById('shapeFillColorInput');
 const shapeStrokeToggle = document.getElementById('shapeStrokeToggle');
@@ -84,9 +86,37 @@ const grainToggle = document.getElementById('grainToggle');
 const grainIntensityInput = document.getElementById('grainIntensityInput');
 const blurToggle = document.getElementById('blurToggle');
 const blurIntensityInput = document.getElementById('blurIntensityInput');
+const blurTypeSelect = document.getElementById('blurTypeSelect');
+const blurGaussianFieldsEl = document.getElementById('blurGaussianFields');
+const blurMotionFieldsEl = document.getElementById('blurMotionFields');
+const motionBlurDistanceInput = document.getElementById('motionBlurDistanceInput');
+const motionBlurAngleInput = document.getElementById('motionBlurAngleInput');
+const motionBlurAngleDial = document.getElementById('motionBlurAngleDial');
+const motionBlurAngleNeedle = document.getElementById('motionBlurAngleNeedle');
+const duotoneToggle = document.getElementById('duotoneToggle');
+const vignetteToggle = document.getElementById('vignetteToggle');
+const vignetteIntensityInput = document.getElementById('vignetteIntensityInput');
+const vignetteSizeInput = document.getElementById('vignetteSizeInput');
+const vignetteColorInput = document.getElementById('vignetteColorInput');
+const cctvToggle = document.getElementById('cctvToggle');
+const cctvIntensityInput = document.getElementById('cctvIntensityInput');
+const cctvOsdToggle = document.getElementById('cctvOsdToggle');
+const cctvOsdFields = document.getElementById('cctvOsdFields');
+const cctvCameraInput = document.getElementById('cctvCameraInput');
+const cctvTimeInput = document.getElementById('cctvTimeInput');
+const duotoneShadowInput = document.getElementById('duotoneShadowInput');
+const duotoneLightInput = document.getElementById('duotoneLightInput');
+const duotoneIntensityInput = document.getElementById('duotoneIntensityInput');
 const saturationInput = document.getElementById('saturationInput');
 const brightnessInput = document.getElementById('brightnessInput');
 const contrastInput = document.getElementById('contrastInput');
+const saturationToggle = document.getElementById('saturationToggle');
+const brightnessToggle = document.getElementById('brightnessToggle');
+const contrastToggle = document.getElementById('contrastToggle');
+const bloomToggle = document.getElementById('bloomToggle');
+const bloomThresholdInput = document.getElementById('bloomThresholdInput');
+const bloomIntensityInput = document.getElementById('bloomIntensityInput');
+const bloomRadiusInput = document.getElementById('bloomRadiusInput');
 const bwToggle = document.getElementById('bwToggle');
 const ghostToggle = document.getElementById('ghostToggle');
 const ghostOffsetXInput = document.getElementById('ghostOffsetXInput');
@@ -104,9 +134,17 @@ const resetEffectsBtn = document.getElementById('resetEffectsBtn');
 const EFFECT_METERS = [
   [grainIntensityInput, document.getElementById('grainIntensityValue'), '%'],
   [blurIntensityInput, document.getElementById('blurIntensityValue'), 'px'],
+  [motionBlurDistanceInput, document.getElementById('motionBlurDistanceValue'), 'px'],
+  [duotoneIntensityInput, document.getElementById('duotoneIntensityValue'), '%'],
+  [vignetteIntensityInput, document.getElementById('vignetteIntensityValue'), '%'],
+  [vignetteSizeInput, document.getElementById('vignetteSizeValue'), '%'],
+  [cctvIntensityInput, document.getElementById('cctvIntensityValue'), '%'],
   [saturationInput, document.getElementById('saturationValue'), '%'],
   [brightnessInput, document.getElementById('brightnessValue'), '%'],
   [contrastInput, document.getElementById('contrastValue'), '%'],
+  [bloomThresholdInput, document.getElementById('bloomThresholdValue'), '%'],
+  [bloomIntensityInput, document.getElementById('bloomIntensityValue'), '%'],
+  [bloomRadiusInput, document.getElementById('bloomRadiusValue'), 'px'],
   [ghostOffsetXInput, document.getElementById('ghostOffsetXValue'), 'px'],
   [ghostOffsetYInput, document.getElementById('ghostOffsetYValue'), 'px'],
   [ghostOpacityInput, document.getElementById('ghostOpacityValue'), '%'],
@@ -129,6 +167,36 @@ for (const [input] of EFFECT_METERS) {
   if (input) input.addEventListener('input', refreshEffectMeters);
 }
 refreshEffectMeters();
+
+// ---- efectos que se despliegan al activarlos ----
+// Cada efecto con controles (sliders, colores, selector…) los muestra solo
+// mientras su casillero esté marcado; desmarcado, queda una sola fila y el
+// efecto no se aplica (el valor de los sliders se conserva por si lo vuelves
+// a activar). Cada entrada es [casillero, contenedor de sus controles].
+const EFFECT_TOGGLE_FIELDS = [
+  [grainToggle, document.getElementById('grainFields')],
+  [blurToggle, document.getElementById('blurFields')],
+  [saturationToggle, document.getElementById('saturationFields')],
+  [brightnessToggle, document.getElementById('brightnessFields')],
+  [contrastToggle, document.getElementById('contrastFields')],
+  [bloomToggle, document.getElementById('bloomFields')],
+  [duotoneToggle, document.getElementById('duotoneFields')],
+  [vignetteToggle, document.getElementById('vignetteFields')],
+  [cctvToggle, document.getElementById('cctvFields')],
+  [cctvOsdToggle, cctvOsdFields],
+  [ghostToggle, document.getElementById('ghostFields')],
+];
+
+function refreshEffectFields() {
+  for (const [toggle, fieldsEl] of EFFECT_TOGGLE_FIELDS) {
+    if (toggle && fieldsEl) fieldsEl.hidden = !toggle.checked;
+  }
+}
+
+for (const [toggle] of EFFECT_TOGGLE_FIELDS) {
+  if (toggle) toggle.addEventListener('change', refreshEffectFields);
+}
+refreshEffectFields();
 
 // Color de las líneas /me en el chat de un servidor de rol tipo GTAW/FiveM
 // (#FFC2A2DA en ARGB → se usa sin el canal alfa, que va siempre opaco).
@@ -153,7 +221,8 @@ let selectedId = null;
 let addTextMode = false;
 let imageAspectRatio = null;
 
-let dragState = null; // { mode: 'move' | 'resize', id, ... }
+let dragState = null; // { mode: 'move' | 'resize' | 'rotate', id, ... }
+let rotateCursorActive = false; // true mientras el cursor lo fija el círculo de giro
 
 // ---- guías de margen (referencia visual fija; nunca se dibujan en el PNG
 // exportado). Siempre a 50px de cada borde, con imantado al mover texto
@@ -1020,6 +1089,9 @@ function drawGrain() {
 // dibujan después con el filtro ya apagado.
 blurToggle.addEventListener('change', draw);
 blurIntensityInput.addEventListener('input', draw);
+saturationToggle.addEventListener('change', draw);
+brightnessToggle.addEventListener('change', draw);
+contrastToggle.addEventListener('change', draw);
 saturationInput.addEventListener('input', draw);
 brightnessInput.addEventListener('input', draw);
 contrastInput.addEventListener('input', draw);
@@ -1027,25 +1099,547 @@ bwToggle.addEventListener('change', draw);
 
 function getImageFilter() {
   const parts = [];
-  if (blurToggle.checked) {
+  if (blurToggle.checked && blurTypeSelect.value === 'gaussian') {
     parts.push(`blur(${Number(blurIntensityInput.value)}px)`);
   }
   const saturation = Number(saturationInput.value);
-  if (saturation !== 100) {
+  if (saturationToggle.checked && saturation !== 100) {
     parts.push(`saturate(${saturation}%)`);
   }
   const brightness = Number(brightnessInput.value);
-  if (brightness !== 100) {
+  if (brightnessToggle.checked && brightness !== 100) {
     parts.push(`brightness(${brightness}%)`);
   }
   const contrast = Number(contrastInput.value);
-  if (contrast !== 100) {
+  if (contrastToggle.checked && contrast !== 100) {
     parts.push(`contrast(${contrast}%)`);
   }
   if (bwToggle.checked) {
     parts.push('grayscale(100%)');
   }
   return parts.length ? parts.join(' ') : 'none';
+}
+
+// ---- desenfoque de movimiento ----
+// El canvas solo trae blur(...) circular; no existe un filtro direccional,
+// así que se arma a mano. Promediar muchas copias de la imagen desplazadas a
+// lo largo de una línea (la dirección del movimiento) es un desenfoque de
+// caja direccional. Para no dibujar cientos de copias se usa el truco de
+// "duplicar": cada pasada mezcla la imagen con ella misma corrida a la mitad
+// de la pasada anterior (D/2, D/4, D/8...), así con k pasadas se promedian
+// 2^k muestras parejas repartidas en toda la distancia D (con D=100 son 7
+// pasadas y 128 muestras, una cada ~0,8px). Cada mezcla es un drawImage a
+// opacidad 0,5, o sea un promedio exacto de dos copias.
+//
+// Igual que con el desenfoque normal, se agranda el lienzo repitiendo el
+// borde más cercano hacia afuera (modo "clamp") para que los cantos de la
+// foto no se mezclen con transparencia y no aparezca un borde claro. Se
+// aplica a toda la composición (fondo + imágenes superpuestas), dentro de
+// drawFilteredComposite, antes de los filtros de foto.
+// Un solo grupo "Desenfoque" con dos tipos: gaussiano (solo su slider) y de
+// movimiento (distancia + ángulo). El selector muestra los campos del tipo
+// elegido; el casillero del grupo enciende/apaga el que esté seleccionado.
+function refreshBlurTypeFields() {
+  const motion = blurTypeSelect.value === 'motion';
+  blurGaussianFieldsEl.hidden = motion;
+  blurMotionFieldsEl.hidden = !motion;
+}
+blurTypeSelect.addEventListener('change', () => {
+  refreshBlurTypeFields();
+  draw();
+});
+refreshBlurTypeFields();
+
+motionBlurDistanceInput.addEventListener('input', draw);
+
+// ---- dial de ángulo (estilo Photoshop) ----
+// Fuente de verdad: `motionBlurAngle` (grados, -180..180). 0° = derecha,
+// positivo = antihorario (90° = arriba), igual que el dial de Photoshop. El
+// campo numérico y la aguja del dial solo reflejan ese valor.
+let motionBlurAngle = 0;
+
+function setMotionBlurAngle(deg, { updateField = true, redraw = true } = {}) {
+  let angle = Math.round(Number(deg));
+  if (!Number.isFinite(angle)) angle = 0;
+  angle = Math.max(-180, Math.min(180, angle));
+  if (angle === -180) angle = 180; // -180° y 180° son la misma dirección
+  motionBlurAngle = angle;
+  if (updateField) motionBlurAngleInput.value = String(angle);
+  // CSS gira en sentido horario, por eso el signo invertido.
+  motionBlurAngleNeedle.style.transform = `rotate(${-angle}deg)`;
+  motionBlurAngleDial.setAttribute('aria-valuenow', String(angle));
+  if (redraw) draw();
+}
+
+function motionBlurAngleFromPointer(evt) {
+  const rect = motionBlurAngleDial.getBoundingClientRect();
+  const dx = evt.clientX - (rect.left + rect.width / 2);
+  const dy = evt.clientY - (rect.top + rect.height / 2);
+  if (dx === 0 && dy === 0) return motionBlurAngle;
+  return (Math.atan2(-dy, dx) * 180) / Math.PI;
+}
+
+let motionDialDragging = false;
+motionBlurAngleDial.addEventListener('pointerdown', (evt) => {
+  motionDialDragging = true;
+  motionBlurAngleDial.setPointerCapture(evt.pointerId);
+  setMotionBlurAngle(motionBlurAngleFromPointer(evt));
+  evt.preventDefault();
+});
+motionBlurAngleDial.addEventListener('pointermove', (evt) => {
+  if (motionDialDragging) setMotionBlurAngle(motionBlurAngleFromPointer(evt));
+});
+const endMotionDialDrag = () => {
+  motionDialDragging = false;
+};
+motionBlurAngleDial.addEventListener('pointerup', endMotionDialDrag);
+motionBlurAngleDial.addEventListener('pointercancel', endMotionDialDrag);
+motionBlurAngleDial.addEventListener('keydown', (evt) => {
+  const dir = { ArrowRight: 1, ArrowUp: 1, ArrowLeft: -1, ArrowDown: -1 }[evt.key];
+  if (!dir) return;
+  evt.preventDefault();
+  setMotionBlurAngle(motionBlurAngle + dir * (evt.shiftKey ? 15 : 1));
+});
+
+// Campo numérico: mientras se escribe no se pisa el texto (un "-" suelto no
+// es un número todavía); al salir del campo se normaliza y se recorta a
+// -180..180.
+motionBlurAngleInput.addEventListener('input', () => {
+  const value = Number(motionBlurAngleInput.value);
+  if (motionBlurAngleInput.value === '' || !Number.isFinite(value)) return;
+  setMotionBlurAngle(value, { updateField: false });
+});
+motionBlurAngleInput.addEventListener('change', () => {
+  setMotionBlurAngle(motionBlurAngleInput.value);
+});
+setMotionBlurAngle(0, { redraw: false });
+
+let motionPadCanvasA = null;
+let motionPadCanvasB = null;
+let motionOutCanvas = null;
+
+// Devuelve un canvas del tamaño pedido, vacío; reutiliza el anterior para no
+// crear lienzos nuevos en cada redibujado. Con `highPrecision` el lienzo se
+// crea en float16: cada pasada de promedio a 8 bits redondea hacia abajo y,
+// repetida 5-7 veces, oscurecía la foto ~2-3 niveles; en float16 ese error
+// desaparece. Si el navegador no soporta la opción, la ignora y queda en 8
+// bits (funciona igual, con ese oscurecimiento mínimo).
+function sizeScratchCanvas(existing, w, h, highPrecision = false) {
+  let c = existing;
+  if (!c) {
+    c = document.createElement('canvas');
+    c.getContext('2d', highPrecision ? { colorType: 'float16' } : undefined);
+  }
+  if (c.width !== w || c.height !== h) {
+    c.width = w;
+    c.height = h;
+  } else {
+    c.getContext('2d').clearRect(0, 0, w, h);
+  }
+  return c;
+}
+
+function applyMotionBlur(source) {
+  if (!blurToggle.checked || blurTypeSelect.value !== 'motion') return source;
+  const distance = Number(motionBlurDistanceInput.value);
+  if (distance < 1) return source;
+
+  // Convención de Photoshop: 0° = horizontal, 90° = vertical, 45° = "/".
+  const angle = (motionBlurAngle * Math.PI) / 180;
+  const dirX = Math.cos(angle);
+  const dirY = -Math.sin(angle);
+
+  const w = source.width;
+  const h = source.height;
+  const passes = Math.max(2, Math.min(7, Math.ceil(Math.log2(distance))));
+  const pad = Math.ceil(distance / 2) + 2;
+
+  motionPadCanvasA = sizeScratchCanvas(motionPadCanvasA, w + pad * 2, h + pad * 2, true);
+  motionPadCanvasB = sizeScratchCanvas(motionPadCanvasB, w + pad * 2, h + pad * 2, true);
+  let current = motionPadCanvasA;
+  let next = motionPadCanvasB;
+
+  // Composición en el medio + franjas de 1px de cada borde estiradas hacia
+  // afuera para rellenar el margen.
+  const pctx = current.getContext('2d');
+  pctx.drawImage(source, 0, 0, w, 1, pad, 0, w, pad); // arriba
+  pctx.drawImage(source, 0, h - 1, w, 1, pad, pad + h, w, pad); // abajo
+  pctx.drawImage(source, 0, 0, 1, h, 0, pad, pad, h); // izquierda
+  pctx.drawImage(source, w - 1, 0, 1, h, pad + w, pad, pad, h); // derecha
+  pctx.drawImage(source, 0, 0, 1, 1, 0, 0, pad, pad); // esquinas
+  pctx.drawImage(source, w - 1, 0, 1, 1, pad + w, 0, pad, pad);
+  pctx.drawImage(source, 0, h - 1, 1, 1, 0, pad + h, pad, pad);
+  pctx.drawImage(source, w - 1, h - 1, 1, 1, pad + w, pad + h, pad, pad);
+  pctx.drawImage(source, pad, pad);
+
+  for (let i = 1; i <= passes; i++) {
+    const shift = distance / 2 ** i;
+    const nctx = next.getContext('2d');
+    nctx.clearRect(0, 0, next.width, next.height);
+    nctx.globalAlpha = 1;
+    nctx.drawImage(current, 0, 0);
+    nctx.globalAlpha = 0.5;
+    nctx.drawImage(current, dirX * shift, dirY * shift);
+    nctx.globalAlpha = 1;
+    [current, next] = [next, current];
+  }
+
+  // Las muestras quedan repartidas de 0 a D·(1 − 2^-k) hacia un solo lado;
+  // se recorta corrido a la mitad de ese rango para que el efecto quede
+  // centrado sobre cada píxel (mitad hacia cada lado de la dirección).
+  const center = (distance * (1 - 2 ** -passes)) / 2;
+  const cropX = pad + Math.round(dirX * center);
+  const cropY = pad + Math.round(dirY * center);
+
+  motionOutCanvas = sizeScratchCanvas(motionOutCanvas, w, h);
+  motionOutCanvas.getContext('2d').drawImage(current, cropX, cropY, w, h, 0, 0, w, h);
+  return motionOutCanvas;
+}
+
+// ---- duotono ----
+// Reemplaza la imagen por una mezcla entre dos colores según la luminosidad:
+// el negro pasa a ser el color de las sombras y el blanco el de las luces
+// (lo de en medio, una mezcla de ambos). Sale de dos capas con blend modes,
+// sin recorrer píxeles a mano:
+//   luces   = gris × colorLuces
+//   sombras = gris invertido × colorSombras
+//   resultado = luces + sombras   ("lighter" suma; como los pesos L y 1-L
+//   suman 1, nunca se pasa de blanco)
+// La intensidad mezcla el resultado con la imagen original. Se aplica sobre
+// lo que ya hay en el lienzo (composición filtrada + fantasma) y antes del
+// grano, para que el grano siga encima y el texto/las formas queden intactos.
+const DUOTONE_DEFAULT_SHADOW = '#0b1e3f';
+const DUOTONE_DEFAULT_LIGHT = '#ff9a3c';
+
+duotoneToggle.addEventListener('change', draw);
+duotoneShadowInput.addEventListener('input', draw);
+duotoneLightInput.addEventListener('input', draw);
+duotoneIntensityInput.addEventListener('input', draw);
+
+let duotoneSrcCanvas = null;
+let duotoneLightCanvas = null;
+let duotoneShadowCanvas = null;
+
+function drawDuotoneLayer(target, source, grayFilter, color) {
+  const tctx = target.getContext('2d');
+  tctx.filter = grayFilter;
+  tctx.drawImage(source, 0, 0);
+  tctx.filter = 'none';
+  tctx.globalCompositeOperation = 'multiply';
+  tctx.fillStyle = color;
+  tctx.fillRect(0, 0, target.width, target.height);
+  tctx.globalCompositeOperation = 'source-over';
+}
+
+function applyDuotone() {
+  if (!duotoneToggle.checked) return;
+  const intensity = Number(duotoneIntensityInput.value) / 100;
+  if (intensity <= 0) return;
+  const w = canvas.width;
+  const h = canvas.height;
+
+  duotoneSrcCanvas = sizeScratchCanvas(duotoneSrcCanvas, w, h);
+  duotoneSrcCanvas.getContext('2d').drawImage(canvas, 0, 0);
+
+  duotoneLightCanvas = sizeScratchCanvas(duotoneLightCanvas, w, h);
+  duotoneShadowCanvas = sizeScratchCanvas(duotoneShadowCanvas, w, h);
+  drawDuotoneLayer(duotoneLightCanvas, duotoneSrcCanvas, 'grayscale(100%)', duotoneLightInput.value);
+  drawDuotoneLayer(
+    duotoneShadowCanvas,
+    duotoneSrcCanvas,
+    'grayscale(100%) invert(100%)',
+    duotoneShadowInput.value
+  );
+
+  const lctx = duotoneLightCanvas.getContext('2d');
+  lctx.globalCompositeOperation = 'lighter';
+  lctx.drawImage(duotoneShadowCanvas, 0, 0);
+  lctx.globalCompositeOperation = 'source-over';
+
+  // "source-atop": solo pinta donde el lienzo ya tenía contenido, y con la
+  // opacidad = intensidad se mezcla con la imagen original.
+  ctx.save();
+  ctx.globalCompositeOperation = 'source-atop';
+  ctx.globalAlpha = intensity;
+  ctx.drawImage(duotoneLightCanvas, 0, 0);
+  ctx.restore();
+}
+
+// ---- resplandor (bloom) ----
+// Simula cómo las zonas muy claras de una foto "se desbordan" y tiñen de luz
+// lo que las rodea (el brillo de una ventana, un foco, un reflejo). No hay
+// forma barata de aislar "los píxeles claros" con los filtros nativos del
+// canvas (no existe un threshold), así que se aproxima con brightness+
+// contrast: subir mucho el brillo y después el contraste empuja lo oscuro
+// hacia el negro y deja casi intactas las zonas ya claras — cuanto más alto
+// el Umbral, más agresivo el empujón y menos superficie "sobrevive" para
+// brillar. Esa silueta de luces se desenfoca (el resplandor no puede tener
+// bordes duros) y se sobrepone con blend "lighter" (suma de luz, como la
+// viñeta pero al revés) a la intensidad elegida.
+// Se aplica sobre la composición ya filtrada + el fantasma (así el
+// resplandor sigue el blur/brillo/contraste ya aplicados) y ANTES del
+// duotono/viñeta/cámara de seguridad, para que esos efectos de color sigan
+// tiñendo también el brillo agregado y no quede un halo con el color
+// original de la foto.
+bloomToggle.addEventListener('change', draw);
+bloomThresholdInput.addEventListener('input', draw);
+bloomIntensityInput.addEventListener('input', draw);
+bloomRadiusInput.addEventListener('input', draw);
+
+let bloomPadCanvas = null;
+let bloomGlowCanvas = null;
+
+function applyBloom() {
+  if (!bloomToggle.checked) return;
+  const intensity = Number(bloomIntensityInput.value) / 100;
+  if (intensity <= 0) return;
+  const radius = Number(bloomRadiusInput.value);
+  const threshold = Number(bloomThresholdInput.value) / 100;
+
+  const w = canvas.width;
+  const h = canvas.height;
+  const pad = Math.ceil(radius * 3) + 4;
+
+  // Mismo truco de "clamp" que el desenfoque normal (ver drawFilteredComposite):
+  // se agranda el lienzo repitiendo el borde más cercano hacia afuera, para
+  // que el blur del resplandor no mezcle los cantos de la foto con
+  // transparencia y aparezca un borde oscuro alrededor de todo.
+  bloomPadCanvas = sizeScratchCanvas(bloomPadCanvas, w + pad * 2, h + pad * 2);
+  const pctx = bloomPadCanvas.getContext('2d');
+  pctx.clearRect(0, 0, bloomPadCanvas.width, bloomPadCanvas.height);
+  pctx.drawImage(canvas, 0, 0, w, 1, pad, 0, w, pad); // arriba
+  pctx.drawImage(canvas, 0, h - 1, w, 1, pad, pad + h, w, pad); // abajo
+  pctx.drawImage(canvas, 0, 0, 1, h, 0, pad, pad, h); // izquierda
+  pctx.drawImage(canvas, w - 1, 0, 1, h, pad + w, pad, pad, h); // derecha
+  pctx.drawImage(canvas, 0, 0, 1, 1, 0, 0, pad, pad); // esquinas
+  pctx.drawImage(canvas, w - 1, 0, 1, 1, pad + w, 0, pad, pad);
+  pctx.drawImage(canvas, 0, h - 1, 1, 1, 0, pad + h, pad, pad);
+  pctx.drawImage(canvas, w - 1, h - 1, 1, 1, pad + w, pad + h, pad, pad);
+  pctx.drawImage(canvas, pad, pad);
+
+  // Umbral aproximado: brightness empuja todo hacia arriba, contrast (que
+  // crece con el umbral) aplasta lo que quedó por debajo de medio gris hacia
+  // el negro — cuanto más alto el umbral, más contraste y menos sobrevive.
+  const brightBoost = 1.4 + threshold * 1.6; // 1.4x .. 3x
+  const contrastPct = 100 + threshold * 500; // 100% .. 600%
+
+  bloomGlowCanvas = sizeScratchCanvas(bloomGlowCanvas, bloomPadCanvas.width, bloomPadCanvas.height);
+  const gctx = bloomGlowCanvas.getContext('2d');
+  gctx.clearRect(0, 0, bloomGlowCanvas.width, bloomGlowCanvas.height);
+  gctx.filter = `brightness(${brightBoost.toFixed(2)}) contrast(${contrastPct.toFixed(0)}%) blur(${radius}px)`;
+  gctx.drawImage(bloomPadCanvas, 0, 0);
+  gctx.filter = 'none';
+
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.globalAlpha = intensity;
+  ctx.drawImage(bloomGlowCanvas, pad, pad, w, h, 0, 0, w, h);
+  ctx.restore();
+}
+
+// ---- viñeta ----
+// Oscurece (o tiñe) los bordes de la imagen con un degradado radial desde el
+// centro. "Tamaño" es cuánto del cuadro queda sin tocar antes de que empiece
+// a oscurecerse (0 = arranca casi desde el centro, 100 = solo se nota bien
+// en las esquinas); "Intensidad" es qué tan oscuro llega el borde. Se aplica
+// sobre lo que ya hay en el lienzo (composición + fantasma + duotono), antes
+// de la cámara de seguridad (que trae su propia viñeta, pensada para ese
+// efecto) y del grano.
+vignetteToggle.addEventListener('change', draw);
+vignetteIntensityInput.addEventListener('input', draw);
+vignetteSizeInput.addEventListener('input', draw);
+vignetteColorInput.addEventListener('input', draw);
+
+function hexToRgb(hex) {
+  const value = hex.replace('#', '');
+  const n = parseInt(value, 16);
+  return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+}
+
+function applyVignette() {
+  if (!vignetteToggle.checked) return;
+  const intensity = Number(vignetteIntensityInput.value) / 100;
+  if (intensity <= 0) return;
+  const w = canvas.width;
+  const h = canvas.height;
+  const cx = w / 2;
+  const cy = h / 2;
+  // Radio del cuadro (esquina más lejana): 0% de tamaño empieza a oscurecer
+  // casi en el centro, 100% deja el degradado apretado contra las esquinas.
+  const maxRadius = Math.hypot(cx, cy);
+  const size = Number(vignetteSizeInput.value) / 100;
+  const innerRadius = maxRadius * size * 0.85;
+  const { r, g, b } = hexToRgb(vignetteColorInput.value);
+
+  ctx.save();
+  const gradient = ctx.createRadialGradient(cx, cy, innerRadius, cx, cy, maxRadius);
+  gradient.addColorStop(0, `rgba(${r}, ${g}, ${b}, 0)`);
+  gradient.addColorStop(1, `rgba(${r}, ${g}, ${b}, ${intensity.toFixed(3)})`);
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, w, h);
+  ctx.restore();
+}
+
+// ---- cámara de seguridad ----
+// Imita una imagen de cámara de vigilancia con una sola intensidad. Con
+// intensidad t (0..1) se combinan, en este orden:
+//   1. baja resolución: se reduce la imagen y se vuelve a ampliar (queda
+//      blanda, como el video comprimido de una cámara barata), y de paso se
+//      desatura y se sube un poco el contraste
+//   2. un leve tinte verdoso
+//   3. los datos en pantalla (nombre de la cámara, REC y fecha/hora), que
+//      quedan nítidos sobre la imagen degradada
+//   4. líneas de barrido horizontales, ruido estático y viñeta (bordes
+//      oscuros), encima de todo, incluidos los datos en pantalla
+// Va después del duotono y antes del grano; el texto y las formas del
+// usuario se dibujan después, así que quedan intactos.
+cctvToggle.addEventListener('change', () => {
+  // Al encender el efecto por primera vez, la fecha/hora arranca en "ahora".
+  if (cctvToggle.checked && cctvTimeInput.value.trim() === '') {
+    cctvTimeInput.value = formatCctvTimestamp(new Date());
+  }
+  draw();
+});
+cctvIntensityInput.addEventListener('input', draw);
+cctvOsdToggle.addEventListener('change', draw);
+cctvCameraInput.addEventListener('input', draw);
+cctvTimeInput.addEventListener('input', draw);
+
+function formatCctvTimestamp(date) {
+  const two = (n) => String(n).padStart(2, '0');
+  return (
+    `${two(date.getDate())}/${two(date.getMonth() + 1)}/${date.getFullYear()} ` +
+    `${two(date.getHours())}:${two(date.getMinutes())}:${two(date.getSeconds())}`
+  );
+}
+
+let cctvLowCanvas = null;
+let cctvNoiseTile = null;
+
+// Ruido estático fijo (se genera una sola vez, así no parpadea al redibujar).
+function ensureCctvNoiseTile() {
+  if (cctvNoiseTile) return cctvNoiseTile;
+  const size = 256;
+  const tile = document.createElement('canvas');
+  tile.width = size;
+  tile.height = size;
+  const tctx = tile.getContext('2d');
+  const data = tctx.createImageData(size, size);
+  for (let i = 0; i < data.data.length; i += 4) {
+    const v = Math.min(255, Math.max(0, 128 + (Math.random() - 0.5) * 200));
+    data.data[i] = v;
+    data.data[i + 1] = v;
+    data.data[i + 2] = v;
+    data.data[i + 3] = 255;
+  }
+  tctx.putImageData(data, 0, 0);
+  cctvNoiseTile = tile;
+  return tile;
+}
+
+function drawCctvOsd(w, h) {
+  const size = Math.max(12, Math.round(h * 0.04));
+  const margin = Math.round(size * 0.9);
+  ctx.save();
+  ctx.font = `bold ${size}px Consolas, "Courier New", monospace`;
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = Math.max(2, size / 6);
+  ctx.strokeStyle = 'rgba(0, 0, 0, 0.65)';
+
+  const writeLine = (text, x, y, align, baseline) => {
+    ctx.textAlign = align;
+    ctx.textBaseline = baseline;
+    ctx.fillStyle = '#f2f2f2';
+    ctx.strokeText(text, x, y);
+    ctx.fillText(text, x, y);
+  };
+
+  const camera = cctvCameraInput.value.trim();
+  if (camera) writeLine(camera, margin, margin, 'left', 'top');
+
+  // REC arriba a la derecha, con su punto rojo a la izquierda del texto.
+  ctx.textAlign = 'right';
+  const recWidth = ctx.measureText('REC').width;
+  writeLine('REC', w - margin, margin, 'right', 'top');
+  const dotRadius = size * 0.3;
+  const dotX = w - margin - recWidth - size * 0.35 - dotRadius;
+  const dotY = margin + size * 0.5;
+  ctx.beginPath();
+  ctx.arc(dotX, dotY, dotRadius, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.fillStyle = '#e5222f';
+  ctx.fill();
+
+  const stamp = cctvTimeInput.value.trim();
+  if (stamp) writeLine(stamp, margin, h - margin, 'left', 'bottom');
+  ctx.restore();
+}
+
+function applyCctv() {
+  if (!cctvToggle.checked) return;
+  const t = Number(cctvIntensityInput.value) / 100;
+  const w = canvas.width;
+  const h = canvas.height;
+
+  if (t > 0) {
+    // 1) baja resolución + desaturado/contraste
+    const scale = 1 / (1 + 1.8 * t);
+    const sw = Math.max(2, Math.round(w * scale));
+    const sh = Math.max(2, Math.round(h * scale));
+    cctvLowCanvas = sizeScratchCanvas(cctvLowCanvas, sw, sh);
+    const lctx = cctvLowCanvas.getContext('2d');
+    lctx.imageSmoothingEnabled = true;
+    lctx.imageSmoothingQuality = 'high';
+    lctx.filter = `grayscale(${(0.8 * t).toFixed(3)}) contrast(${(1 + 0.3 * t).toFixed(3)}) brightness(${(1 + 0.08 * t).toFixed(3)})`;
+    lctx.drawImage(canvas, 0, 0, sw, sh);
+    lctx.filter = 'none';
+    ctx.save();
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(cctvLowCanvas, 0, 0, sw, sh, 0, 0, w, h);
+
+    // 2) tinte verdoso
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.globalAlpha = 0.5 * t;
+    ctx.fillStyle = 'rgb(175, 255, 190)';
+    ctx.fillRect(0, 0, w, h);
+    ctx.restore();
+  }
+
+  // 3) datos en pantalla
+  if (cctvOsdToggle.checked) drawCctvOsd(w, h);
+
+  if (t > 0) {
+    ctx.save();
+    // 4a) líneas de barrido
+    const period = Math.max(2, Math.round(h / 180));
+    const lineTile = document.createElement('canvas');
+    lineTile.width = 1;
+    lineTile.height = period;
+    const lctx = lineTile.getContext('2d');
+    lctx.fillStyle = '#000';
+    lctx.fillRect(0, Math.floor(period / 2), 1, Math.ceil(period / 2));
+    ctx.globalAlpha = 0.34 * t;
+    ctx.fillStyle = ctx.createPattern(lineTile, 'repeat');
+    ctx.fillRect(0, 0, w, h);
+
+    // 4b) ruido estático
+    ctx.globalAlpha = 0.7 * t;
+    ctx.globalCompositeOperation = 'overlay';
+    ctx.fillStyle = ctx.createPattern(ensureCctvNoiseTile(), 'repeat');
+    ctx.fillRect(0, 0, w, h);
+
+    // 4c) viñeta
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+    const cx = w / 2;
+    const cy = h / 2;
+    const vignette = ctx.createRadialGradient(cx, cy, Math.min(w, h) * 0.3, cx, cy, Math.hypot(w, h) / 2);
+    vignette.addColorStop(0, 'rgba(0, 0, 0, 0)');
+    vignette.addColorStop(1, `rgba(0, 0, 0, ${(0.6 * t).toFixed(3)})`);
+    ctx.fillStyle = vignette;
+    ctx.fillRect(0, 0, w, h);
+    ctx.restore();
+  }
 }
 
 // ---- efecto fantasma (ghosting) ----
@@ -1105,9 +1699,33 @@ resetEffectsBtn.addEventListener('click', () => {
   grainIntensityInput.value = 0;
   blurToggle.checked = false;
   blurIntensityInput.value = 0;
+  blurTypeSelect.value = 'gaussian';
+  refreshBlurTypeFields();
+  motionBlurDistanceInput.value = 0;
+  setMotionBlurAngle(0, { redraw: false });
+  duotoneToggle.checked = false;
+  duotoneShadowInput.value = DUOTONE_DEFAULT_SHADOW;
+  duotoneLightInput.value = DUOTONE_DEFAULT_LIGHT;
+  duotoneIntensityInput.value = 100;
+  vignetteToggle.checked = false;
+  vignetteIntensityInput.value = 60;
+  vignetteSizeInput.value = 50;
+  vignetteColorInput.value = '#000000';
+  cctvToggle.checked = false;
+  cctvIntensityInput.value = 70;
+  cctvOsdToggle.checked = true;
+  cctvCameraInput.value = 'CAM 01';
+  cctvTimeInput.value = '';
+  saturationToggle.checked = false;
+  brightnessToggle.checked = false;
+  contrastToggle.checked = false;
   saturationInput.value = 100;
   brightnessInput.value = 100;
   contrastInput.value = 100;
+  bloomToggle.checked = false;
+  bloomThresholdInput.value = 70;
+  bloomIntensityInput.value = 50;
+  bloomRadiusInput.value = 15;
   bwToggle.checked = false;
   ghostToggle.checked = false;
   ghostOffsetXInput.value = 0;
@@ -1117,6 +1735,7 @@ resetEffectsBtn.addEventListener('click', () => {
   ghostZoomInput.value = 0;
   refreshAllRangeProgress();
   refreshEffectMeters();
+  refreshEffectFields();
   draw();
 });
 
@@ -1747,6 +2366,9 @@ function updateLayerControlsUI() {
   layerDeleteBtn.disabled = isCroppingThis;
 
   shapeControlsEl.hidden = obj.type !== 'shape';
+  if (obj.type === 'shape' && document.activeElement !== shapeRotationInput) {
+    shapeRotationInput.value = String(Math.round(obj.rotation || 0));
+  }
 }
 
 layerOpacityInput.addEventListener('input', () => {
@@ -1891,6 +2513,7 @@ addRectBtn.addEventListener('click', () => {
   };
   layers.push(obj);
   selectedId = obj.id;
+  syncShapeToolbarToObject(obj);
   draw();
 });
 
@@ -1921,6 +2544,7 @@ addBlurBtn.addEventListener('click', () => {
   };
   layers.push(obj);
   selectedId = obj.id;
+  syncShapeToolbarToObject(obj);
   draw();
 });
 
@@ -2014,6 +2638,33 @@ shapeBlurAmountInput.addEventListener('input', () => {
   if (shapeHistoryPending) pushHistory();
   shapeHistoryPending = false;
   target.blurAmount = Number(shapeBlurAmountInput.value);
+  draw();
+});
+
+// ---- ángulo de giro de la forma (campo numérico + botón "quitar giro") ----
+// El círculo sobre la forma es la vía directa; esto sirve para un ángulo exacto.
+shapeRotationInput.addEventListener('focus', armShapeHistoryPending);
+shapeRotationInput.addEventListener('input', () => {
+  const target = getSelectedShape();
+  if (!target) return;
+  const value = Number(shapeRotationInput.value);
+  if (shapeRotationInput.value === '' || !Number.isFinite(value)) return;
+  if (shapeHistoryPending) pushHistory();
+  shapeHistoryPending = false;
+  target.rotation = normalizeDegrees(value);
+  draw();
+});
+// Al salir del campo se normaliza lo escrito (p. ej. 400 -> 40, vacío -> 0).
+shapeRotationInput.addEventListener('change', () => {
+  armShapeHistoryPending();
+  const target = getSelectedShape();
+  if (target) shapeRotationInput.value = String(Math.round(target.rotation || 0));
+});
+shapeRotationResetBtn.addEventListener('click', () => {
+  const target = getSelectedShape();
+  if (!target || !target.rotation) return;
+  pushHistory();
+  target.rotation = 0;
   draw();
 });
 
@@ -2184,12 +2835,84 @@ function getHandleSize(obj) {
 // la inferior derecha) — la esquina opuesta a la que se arrastra queda fija.
 function getHandlePoints(obj) {
   const { width, height } = getBounds(obj);
-  return {
+  const corners = {
     nw: { x: obj.x, y: obj.y },
     ne: { x: obj.x + width, y: obj.y },
     se: { x: obj.x + width, y: obj.y + height },
     sw: { x: obj.x, y: obj.y + height },
   };
+  if (!obj.rotation) return corners;
+  // Forma girada: las esquinas se giran alrededor del centro.
+  const center = getLayerCenter(obj);
+  const rad = getRotationRad(obj);
+  for (const key of Object.keys(corners)) {
+    const v = rotateVector(corners[key].x - center.x, corners[key].y - center.y, rad);
+    corners[key] = { x: center.x + v.x, y: center.y + v.y };
+  }
+  return corners;
+}
+
+// ---- giro de formas ----
+// Las formas (rectángulo y área de desenfoque) pueden girar. Guardan
+// `rotation` en grados (positivo = sentido horario en pantalla) y siempre
+// giran alrededor de su centro; x/y/width/height siguen describiendo el
+// rectángulo SIN girar, así que mover y redimensionar reutilizan la misma
+// matemática pasando por el marco girado. Texto e imágenes no giran.
+const ROTATE_HANDLE_GAP = 22; // distancia del círculo de giro al borde superior
+
+function getRotationRad(obj) {
+  return ((obj.rotation || 0) * Math.PI) / 180;
+}
+
+function getLayerCenter(obj) {
+  const { width, height } = getBounds(obj);
+  return { x: obj.x + width / 2, y: obj.y + height / 2 };
+}
+
+function rotateVector(x, y, rad) {
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+  return { x: x * cos - y * sin, y: x * sin + y * cos };
+}
+
+// Deja el ángulo entre -180 y 180.
+function normalizeDegrees(deg) {
+  let d = ((deg % 360) + 360) % 360;
+  if (d > 180) d -= 360;
+  return d;
+}
+
+function pointInLayer(obj, point) {
+  const { width, height } = getBounds(obj);
+  if (!obj.rotation) {
+    return point.x >= obj.x && point.x <= obj.x + width && point.y >= obj.y && point.y <= obj.y + height;
+  }
+  // Se lleva el punto al marco de la forma (sin girar) y se prueba ahí.
+  const center = getLayerCenter(obj);
+  const local = rotateVector(point.x - center.x, point.y - center.y, -getRotationRad(obj));
+  return Math.abs(local.x) <= width / 2 && Math.abs(local.y) <= height / 2;
+}
+
+// Círculo de giro, encima del borde superior (en el marco de la forma).
+function getRotateHandle(obj) {
+  if (obj.type !== 'shape') return null;
+  const { height } = getBounds(obj);
+  const center = getLayerCenter(obj);
+  const distance = height / 2 + 4 + ROTATE_HANDLE_GAP;
+  const v = rotateVector(0, -distance, getRotationRad(obj));
+  return {
+    x: center.x + v.x,
+    y: center.y + v.y,
+    radius: Math.max(7, getHandleSize(obj) * 0.7),
+    center,
+    distance,
+  };
+}
+
+function isPointOnRotateHandle(point, obj) {
+  const handle = getRotateHandle(obj);
+  if (!handle) return false;
+  return distanceBetween(point, handle) <= handle.radius + 3;
 }
 
 const OPPOSITE_HANDLE = { nw: 'se', ne: 'sw', se: 'nw', sw: 'ne' };
@@ -2234,8 +2957,13 @@ function ensureCompositeCanvas() {
 // transparencia con la que mezclarse), y se recorta de vuelta al tamaño
 // real — así el desenfoque nunca "ve" un borde transparente.
 function drawFilteredComposite(source, targetCtx) {
+  // Primero el desenfoque de movimiento (si está activo): devuelve una copia
+  // ya movida del mismo tamaño, así que el resto (desenfoque, saturación,
+  // etc.) sigue igual y puede combinarse con él.
+  source = applyMotionBlur(source);
   const filter = getImageFilter();
-  const blurPx = blurToggle.checked ? Number(blurIntensityInput.value) : 0;
+  const blurPx =
+    blurToggle.checked && blurTypeSelect.value === 'gaussian' ? Number(blurIntensityInput.value) : 0;
 
   if (blurPx <= 0) {
     targetCtx.save();
@@ -2316,6 +3044,18 @@ function draw() {
   //    encima de la composición ya filtrada.
   drawGhost();
 
+  // 3.4) Resplandor: agrega brillo alrededor de las zonas más claras.
+  applyBloom();
+
+  // 3.5) Duotono: recolorea todo lo de arriba (composición + fantasma + resplandor).
+  applyDuotone();
+
+  // 3.6) Viñeta: oscurece los bordes.
+  applyVignette();
+
+  // 3.7) Cámara de seguridad: degrada la imagen y agrega sus datos en pantalla.
+  applyCctv();
+
   // 4) El grano de película va encima de todo lo anterior (fondo +
   //    imágenes superpuestas), para que se note incluso si hay una imagen
   //    puesta arriba de la foto original.
@@ -2334,6 +3074,13 @@ function draw() {
       ctx.save();
       ctx.globalAlpha = obj.opacity != null ? obj.opacity : 1;
       if (obj.shapeType === 'rect') {
+        if (obj.rotation) {
+          const cx = obj.x + obj.width / 2;
+          const cy = obj.y + obj.height / 2;
+          ctx.translate(cx, cy);
+          ctx.rotate(getRotationRad(obj));
+          ctx.translate(-cx, -cy);
+        }
         if (obj.fillEnabled) {
           ctx.fillStyle = obj.fillColor;
           ctx.fillRect(obj.x, obj.y, obj.width, obj.height);
@@ -2363,7 +3110,16 @@ function draw() {
         // puede tomar de muestra los píxeles de alrededor (que están fuera
         // del recorte) así el desenfoque no tiene un borde artificial feo.
         ctx.beginPath();
-        ctx.rect(obj.x, obj.y, obj.width, obj.height);
+        if (obj.rotation) {
+          const c = getHandlePoints(obj);
+          ctx.moveTo(c.nw.x, c.nw.y);
+          ctx.lineTo(c.ne.x, c.ne.y);
+          ctx.lineTo(c.se.x, c.se.y);
+          ctx.lineTo(c.sw.x, c.sw.y);
+          ctx.closePath();
+        } else {
+          ctx.rect(obj.x, obj.y, obj.width, obj.height);
+        }
         ctx.clip();
         ctx.filter = `blur(${obj.blurAmount}px)`;
         ctx.drawImage(canvas, 0, 0);
@@ -2414,24 +3170,52 @@ function draw() {
       : layers.find((o) => o.id === selectedId);
   if (selectedObj) {
     const { width, height } = getBounds(selectedObj);
+    const center = getLayerCenter(selectedObj);
+    const size = getHandleSize(selectedObj);
     ctx.save();
+    // Todo se dibuja en el marco de la capa (centrado y girado): así el
+    // recuadro y los tiradores acompañan el giro de las formas.
+    ctx.translate(center.x, center.y);
+    ctx.rotate(getRotationRad(selectedObj));
     ctx.setLineDash([5, 4]);
     ctx.lineWidth = 1.5;
     ctx.strokeStyle = 'rgba(255,255,255,0.85)';
-    ctx.strokeRect(selectedObj.x - 4, selectedObj.y - 4, width + 8, height + 8);
-    ctx.restore();
+    ctx.strokeRect(-width / 2 - 4, -height / 2 - 4, width + 8, height + 8);
 
-    const size = getHandleSize(selectedObj);
-    const points = getHandlePoints(selectedObj);
-    ctx.save();
     ctx.setLineDash([]);
-    for (const key of ['nw', 'ne', 'se', 'sw']) {
-      const p = points[key];
+    for (const [sx, sy] of [
+      [-1, -1],
+      [1, -1],
+      [1, 1],
+      [-1, 1],
+    ]) {
+      const px = (sx * width) / 2;
+      const py = (sy * height) / 2;
       ctx.fillStyle = '#ffffff';
-      ctx.fillRect(p.x - size / 2, p.y - size / 2, size, size);
+      ctx.fillRect(px - size / 2, py - size / 2, size, size);
       ctx.strokeStyle = 'rgba(0,0,0,0.65)';
       ctx.lineWidth = 1;
-      ctx.strokeRect(p.x - size / 2, p.y - size / 2, size, size);
+      ctx.strokeRect(px - size / 2, py - size / 2, size, size);
+    }
+
+    // Círculo para girar la forma, unido al borde superior por una línea.
+    const rotateHandle = getRotateHandle(selectedObj);
+    if (rotateHandle) {
+      const topY = -height / 2 - 4;
+      const circleY = -rotateHandle.distance;
+      ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(0, topY);
+      ctx.lineTo(0, circleY + rotateHandle.radius);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(0, circleY, rotateHandle.radius, 0, Math.PI * 2);
+      ctx.fillStyle = '#ffffff';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(0,0,0,0.65)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
     }
     ctx.restore();
   }
@@ -3077,10 +3861,7 @@ function getCanvasPoint(evt) {
 function hitTest(point) {
   for (let i = layers.length - 1; i >= 0; i--) {
     const obj = layers[i];
-    const { width, height } = getBounds(obj);
-    if (point.x >= obj.x && point.x <= obj.x + width && point.y >= obj.y && point.y <= obj.y + height) {
-      return obj;
-    }
+    if (pointInLayer(obj, point)) return obj;
   }
   return null;
 }
@@ -3153,6 +3934,21 @@ canvas.addEventListener('mousedown', (evt) => {
   if (selectedId != null) {
     const selectedObj = layers.find((o) => o.id === selectedId);
     if (selectedObj) {
+      // Círculo de giro (solo formas): gira la forma alrededor de su centro.
+      if (isPointOnRotateHandle(point, selectedObj)) {
+        pushHistory();
+        const center = getLayerCenter(selectedObj);
+        dragState = {
+          mode: 'rotate',
+          id: selectedObj.id,
+          center,
+          startAngle: Math.atan2(point.y - center.y, point.x - center.x),
+          startRotation: selectedObj.rotation || 0,
+        };
+        rotateCursorActive = true;
+        canvas.style.cursor = 'grabbing';
+        return;
+      }
       const handle = getTextHandleAt(point, selectedObj);
       if (handle) {
         pushHistory();
@@ -3316,20 +4112,55 @@ canvas.addEventListener('mousemove', (evt) => {
     return;
   }
 
-  if (!dragState) return;
+  if (!dragState) {
+    // Cursor de "agarrar" al pasar sobre el círculo de giro de una forma.
+    const selected = selectedId != null ? layers.find((o) => o.id === selectedId) : null;
+    if (selected && selected.type === 'shape' && isPointOnRotateHandle(point, selected)) {
+      canvas.style.cursor = 'grab';
+      rotateCursorActive = true;
+    } else if (rotateCursorActive) {
+      canvas.style.cursor = '';
+      rotateCursorActive = false;
+    }
+    return;
+  }
   const obj = layers.find((o) => o.id === dragState.id);
   if (!obj) return;
+
+  if (dragState.mode === 'rotate') {
+    const angle = Math.atan2(point.y - dragState.center.y, point.x - dragState.center.x);
+    let deg = dragState.startRotation + ((angle - dragState.startAngle) * 180) / Math.PI;
+    if (evt.shiftKey) {
+      deg = Math.round(deg / 15) * 15; // con Shift, de 15° en 15°
+    } else {
+      // Pequeño imán a 0°, 90°, 180° y -90° para enderezar fácil.
+      const nearest = Math.round(deg / 90) * 90;
+      if (Math.abs(deg - nearest) <= 2) deg = nearest;
+    }
+    obj.rotation = normalizeDegrees(deg);
+    draw();
+    return;
+  }
 
   if (dragState.mode === 'resize') {
     if (obj.type === 'shape') {
       // Redimensionado libre (no proporcional): la esquina arrastrada
       // sigue al mouse tal cual, la opuesta queda fija — así ancho y alto
       // se pueden ajustar de forma totalmente independiente.
+      // Si la forma está girada, la diferencia entre la esquina fija y el
+      // mouse se mide en el marco girado (a lo largo de sus propios lados);
+      // el nuevo centro queda a mitad de camino de esa diagonal. Sin giro
+      // esto da exactamente el mismo resultado que antes.
       const anchor = dragState.anchor;
-      obj.width = Math.max(MIN_IMAGE_LAYER_SIZE, Math.abs(point.x - anchor.x));
-      obj.height = Math.max(MIN_IMAGE_LAYER_SIZE, Math.abs(point.y - anchor.y));
-      obj.x = Math.min(point.x, anchor.x);
-      obj.y = Math.min(point.y, anchor.y);
+      const rad = getRotationRad(obj);
+      const local = rotateVector(point.x - anchor.x, point.y - anchor.y, -rad);
+      obj.width = Math.max(MIN_IMAGE_LAYER_SIZE, Math.abs(local.x));
+      obj.height = Math.max(MIN_IMAGE_LAYER_SIZE, Math.abs(local.y));
+      const signX = local.x < 0 ? -1 : 1;
+      const signY = local.y < 0 ? -1 : 1;
+      const half = rotateVector((signX * obj.width) / 2, (signY * obj.height) / 2, rad);
+      obj.x = anchor.x + half.x - obj.width / 2;
+      obj.y = anchor.y + half.y - obj.height / 2;
       draw();
       return;
     }
@@ -3365,12 +4196,16 @@ canvas.addEventListener('mousemove', (evt) => {
     obj.x = point.x - dragState.offsetX;
     obj.y = point.y - dragState.offsetY;
     const { width, height } = getBounds(obj);
-    snapToGuides(obj, width, height);
+    if (!obj.rotation) snapToGuides(obj, width, height);
   }
   draw();
 });
 
 window.addEventListener('mouseup', () => {
+  if (dragState && dragState.mode === 'rotate') {
+    canvas.style.cursor = '';
+    rotateCursorActive = false;
+  }
   dragState = null;
   if (cropDragState && cropDragState.type === 'pan-image') {
     canvas.style.cursor = 'grab';

@@ -10,6 +10,7 @@ mod capture;
 mod commands;
 mod config;
 mod discord;
+mod gifmaker;
 mod inventory;
 
 use capture::CaptureManager;
@@ -43,10 +44,18 @@ const AUTOSTART_ARG: &str = "--minimized";
 /// actualizar su tilde cuando el usuario cambia la opción desde la app.
 pub struct TrayAutostartItem(pub CheckMenuItem<tauri::Wry>);
 
+/// Si la app arrancó por el inicio automático de Windows (con
+/// AUTOSTART_ARG) — lo consulta `frontend_ready` para decidir si mostrar
+/// la ventana una vez que el frontend ya cargó.
+pub struct StartedByAutostart(pub bool);
+
 /// Trae la ventana principal al frente (la restaura si estaba minimizada u
 /// oculta en la bandeja).
 fn show_main_window(app: &tauri::AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
+        // set_skip_taskbar(false) deshace lo que hace el botón X al ocultar
+        // la ventana — ver el CloseRequested más abajo.
+        let _ = window.set_skip_taskbar(false);
         let _ = window.unminimize();
         let _ = window.show();
         let _ = window.set_focus();
@@ -171,6 +180,10 @@ fn main() {
             commands::install_update,
             commands::autostart_get,
             commands::autostart_set,
+            gifmaker::gif_pick_video,
+            gifmaker::gif_generate,
+            gifmaker::gif_save,
+            gifmaker::gif_discard,
             frontend_ready,
         ])
         .setup(|app| {
@@ -191,8 +204,8 @@ fn main() {
 
             setup_tray(app)?;
 
-            // Actividad fija en Discord ("Haciendo relatos") mientras la
-            // app esté abierta — ver discord.rs.
+            // Actividad fija en Discord ("Haciendo relatos") mientras la app
+            // esté abierta — ver discord.rs.
             discord::spawn();
 
             // Ping periódico a Supabase para que el proyecto del inventario
@@ -220,12 +233,13 @@ fn main() {
                 let _ = window.maximize();
 
                 // Si Windows nos lanzó al iniciar sesión, nos quedamos en la
-                // bandeja; si el usuario abrió la app a mano, mostramos la
-                // ventana como siempre.
+                // bandeja; si el usuario abrió la app a mano, se muestra más
+                // abajo, en frontend_ready — recién cuando el frontend ya
+                // cargó y pintó su primer frame, para no mostrar la ventana
+                // vacía un instante (el pestañeo que se veía al abrir la
+                // app).
                 let started_by_autostart = std::env::args().any(|a| a == AUTOSTART_ARG);
-                if !started_by_autostart {
-                    let _ = window.show();
-                }
+                app.manage(StartedByAutostart(started_by_autostart));
 
                 let handle_for_resize = handle.clone();
                 let maximize_lock: MaximizeLock = app.state::<MaximizeLock>().inner().clone();
@@ -237,13 +251,31 @@ fn main() {
                     if let WindowEvent::CloseRequested { api, .. } = event {
                         api.prevent_close();
                         if let Some(win) = handle_for_resize.get_webview_window("main") {
-                            let _ = win.hide();
+                            // minimize() en vez de hide(): en Windows, ocultar
+                            // la ventana del todo (hide) hace que WebView2
+                            // suelte su superficie de dibujo y la repinte de
+                            // cero al volver a mostrarla — eso es el pestañeo
+                            // que se veía al sacar la app de la bandeja.
+                            // Minimizarla y quitarle el ícono de la barra de
+                            // tareas la deja igual de "oculta" (solo queda el
+                            // ícono de la bandeja) pero sin ese repintado.
+                            let _ = win.set_skip_taskbar(true);
+                            let _ = win.minimize();
                         }
                         return;
                     }
 
                     if let WindowEvent::Resized(_) = event {
                         if let Some(win) = handle_for_resize.get_webview_window("main") {
+                            // Minimizar (el botón X, ver arriba) también
+                            // dispara Resized. Sin este filtro, el lock de
+                            // "maximizar sí o sí" de más abajo pelearía
+                            // contra eso y la volvería a maximizar apenas se
+                            // minimiza.
+                            if win.is_minimized().unwrap_or(false) {
+                                return;
+                            }
+
                             let is_maxed = win.is_maximized().unwrap_or(false);
 
                             // Si el editor de capturas activó el lock y el
@@ -290,5 +322,18 @@ fn main() {
 /// `did-finish-load` del main.js original).
 #[tauri::command]
 fn frontend_ready(app: tauri::AppHandle, mgr: tauri::State<'_, Arc<CaptureManager>>) {
-    capture::start(app, mgr.inner().clone());
+    capture::start(app.clone(), mgr.inner().clone());
+
+    // Recién ahora el frontend ya cargó y pintó su primer frame — mostrar
+    // la ventana en este momento (en vez de apenas arranca la app, antes de
+    // que WebView2 tenga algo pintado) es lo que evita el pestañeo/flash
+    // que se veía al abrir la app. Si arrancó por el inicio automático de
+    // Windows, se queda oculta en la bandeja como siempre.
+    if let Some(started) = app.try_state::<StartedByAutostart>() {
+        if !started.0 {
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+            }
+        }
+    }
 }

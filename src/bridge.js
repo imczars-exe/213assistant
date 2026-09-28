@@ -6,7 +6,7 @@
 // ipcRenderer).
 
 (() => {
-  const { invoke } = window.__TAURI__.core;
+  const { invoke, convertFileSrc } = window.__TAURI__.core;
   const { listen } = window.__TAURI__.event;
   const { getCurrentWindow } = window.__TAURI__.window;
   const { confirm, message } = window.__TAURI__.dialog;
@@ -71,6 +71,17 @@
     openImage: () => invoke('image_open'),
     saveImage: (dataUrl, suggestedName) => invoke('image_save', { dataUrl, suggestedName }),
     openExternal: (url) => invoke('shell_open_external', { url }),
+
+    // ---- GIFs (ffmpeg + gifski) ----
+    toAssetUrl: (path) => convertFileSrc(path),
+    pickVideo: () => invoke('gif_pick_video'),
+    generateGif: (request) => invoke('gif_generate', { request }),
+    saveGif: (gifPath) => invoke('gif_save', { gifPath }),
+    discardGif: (gifPath) => invoke('gif_discard', { gifPath }),
+    onGifStatus: (callback) => {
+      const unlistenPromise = listen('gif:status', (event) => callback(event.payload));
+      return () => unlistenPromise.then((unlisten) => unlisten());
+    },
 
     inventoryLogin: (password) => invoke('inventory_login', { password }),
     getInventory: () => invoke('inventory_get'),
